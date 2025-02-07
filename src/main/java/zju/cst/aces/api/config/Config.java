@@ -130,7 +130,7 @@ public class Config {
         public int testNumber = 5;
         public int maxRounds = 5;
         public int maxPromptTokens = 2600;
-        public int maxResponseTokens = 10240;
+        public int maxResponseTokens = 1024;
         public int minErrorTokens = 500;
         public int sleepTime = 0;
         public int dependencyDepth = 1;
