@@ -9,6 +9,7 @@ import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.PromptInfo;
 import zju.cst.aces.prompt.PromptGenerator;
 import zju.cst.aces.runner.AbstractRunner;
+import zju.cst.aces.runner.solution_runner.SofiaRunner;
 import zju.cst.aces.util.TokenCounter;
 
 import java.io.IOException;
@@ -44,7 +45,14 @@ public class PromptConstructorImpl implements PromptConstructor {
     }
 
     public void setPromptInfoWithDep(ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
-        this.promptInfo = AbstractRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
+        switch (config.getPhaseType()) {
+            case "SOFIA":
+                this.promptInfo = SofiaRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
+                break;
+            default:
+                this.promptInfo = AbstractRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
+                break;
+        }
     }
 
     public void setPromptInfoWithoutDep(ClassInfo classInfo, MethodInfo methodInfo) throws IOException {

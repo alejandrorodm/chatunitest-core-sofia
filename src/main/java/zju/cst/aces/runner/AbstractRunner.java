@@ -283,6 +283,7 @@ public abstract class AbstractRunner {
             String fullClassName = Task.getFullClassName(config, className);
             Path classInfoPath = config.getParseOutput().resolve(fullClassName.replace(".", File.separator)).resolve("class.json");
             if (!classInfoPath.toFile().exists()) {
+
                 return null;
             }
             return GSON.fromJson(new String(Files.readAllBytes(classInfoPath), StandardCharsets.UTF_8), ClassInfo.class);
