@@ -101,6 +101,7 @@ public class Config {
     public String phaseType;
     public boolean useSlice;
     public boolean useExtra;
+    public List<String> dependencyPaths;
 
     @Getter
     @Setter
@@ -164,6 +165,7 @@ public class Config {
         public String phaseType; //TODO
         public boolean useSlice;
         public boolean useExtra;
+        public List<String> dependencyPaths;
 
         public ConfigBuilder(Project project) {
             initDefault(project);
@@ -528,6 +530,15 @@ public class Config {
             return this;
         }
 
+        public ConfigBuilder dependencyPaths(List<String> dependencyPaths){
+            this.dependencyPaths = new ArrayList<>(dependencyPaths);
+            return this;
+        }
+
+        public void setDependencyPaths(List<String> dependencyPaths){
+            this.dependencyPaths = new ArrayList<>(dependencyPaths);
+        }
+
         public void setProxy(String proxy) {
             this.proxy = proxy;
             setProxyStr();
@@ -648,6 +659,7 @@ public class Config {
             config.setUseExtra(this.useExtra);
             config.setCoverageAnalyzer_jar_path(this.coverageAnalyzer_jar_path);
             config.setMax_coverage_improve_time(this.max_coverage_improve_time);
+            config.setDependencyPaths(this.dependencyPaths);
             return config;
         }
     }

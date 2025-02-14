@@ -1,9 +1,16 @@
 package zju.cst.aces.runner.solution_runner;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
+import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.repository.RepositorySystem;
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.api.OutputSinkFactory;
+import zju.cst.aces.api.Logger;
 import zju.cst.aces.api.Task;
 import zju.cst.aces.api.config.Config;
 import zju.cst.aces.dto.ClassInfo;
@@ -22,8 +29,22 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 public class SofiaRunner extends MethodRunner {
+
+    private static List<String> dependencies;
+    private static Logger logger;
+
     public SofiaRunner(Config config, String fullClassName, MethodInfo methodInfo) throws IOException {
         super(config, fullClassName, methodInfo);
+        dependencies = new ArrayList<>(config.getDependencyPaths());
+
+        logger = config.getLogger();
+    }
+
+    /*
+    Just in case the constructor is not invoked before 'generatePromptInfoWithDep'
+     */
+    public static void setStaticParams(Config config) {
+        dependencies = new ArrayList<>(config.getDependencyPaths());
     }
 
     public static PromptInfo generatePromptInfoWithDep(Config config, ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
@@ -43,6 +64,7 @@ public class SofiaRunner extends MethodRunner {
             if (methodInfo.dependentMethods.containsKey(depClassName)) {
                 continue;
             }
+
             promptInfo.addConstructorDeps(depClassName, SofiaRunner.getDepInfo(config, depClassName, depMethods));
         }
 
@@ -104,7 +126,7 @@ public class SofiaRunner extends MethodRunner {
         ClassInfo depClassInfo = getClassInfo(config, depClassName);
         if (depClassInfo == null) {
             try {
-                return getSourceCodeFromExternalClass(depClassName);
+                return getSourceCode(depClassName);
             } catch (Exception e) {
                 return null;
             }
@@ -141,54 +163,74 @@ public class SofiaRunner extends MethodRunner {
         return basicInfo + getterSetter + sourceDepMethods + "}";
     }
 
+    public static String getSourceCode(String className) throws IOException {
+        String classPath = className.replace('.', '/') + ".class";
+        for (String dependency : dependencies) {
 
-
-    private static String getSourceCodeFromExternalClass(String className, MavenProject project) {
-        for (Artifact artifact : project.getArtifacts()) {
-            File jarFile = artifact.getFile();
-            if (jarFile != null && jarFile.exists()) {
-                try (JarFile jar = new JarFile(jarFile)) {
-                    String classFilePath = className.replace(".", "/") + ".class";
-                    JarEntry entry = jar.getJarEntry(classFilePath);
-                    if (entry != null) {
-                        InputStream is = jar.getInputStream(entry);
-                        Path tempFile = Files.createTempFile("classfile", ".class");
-                        Files.copy(is, tempFile, StandardCopyOption.REPLACE_EXISTING);
-
-                        CfrDriver driver = new CfrDriver.Builder()
-                                .withOptions(Collections.singletonMap("decodestringswitch", "true"))
-                                .withOutputSink(new OutputSinkFactory() {
-                                    @Override
-                                    public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> collection) {
-                                        return Collections.singletonList(SinkClass.STRING);
-                                    }
-                                    @Override
-                                    public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
-                                        return (Sink<T>) System.out::println;
-                                    }
-                                })
-                                .build();
-
-                        driver.analyse(Collections.singletonList(tempFile.toString()));
-                        return new String(Files.readAllBytes(tempFile));
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
+            File jarFile = new File(dependency);
+            if (jarFile.exists()) {
+                String decompiledClass = decompileClassFromJar(jarFile, classPath);
+                if (decompiledClass != null) {
+                    return decompiledClass;
                 }
             }
         }
         return null;
     }
 
-    @Mojo(name = "my-goal", defaultPhase = LifecyclePhase.GENERATE_TEST_SOURCES, requiresDependencyResolution = ResolutionScope.COMPILE)
-    public class MyPluginMojo extends AbstractMojo {
+    private static String decompileClassFromJar(File jarFile, String classPath) throws IOException {
+        // Extract .class from JAR
+        File tempClassFile = extractClassFile(jarFile, classPath);
+        if (tempClassFile == null) {
+            logger.info("NOT FOUND " + jarFile + " --> " + classPath);
+            return null;
+        }
 
-        @Parameter(defaultValue = "${project}", readonly = true, required = true)
-        private MavenProject project;
+        logger.info("FOUND " + jarFile + " --> " + classPath);
 
-        public void execute() {
-            String sourceCode = getSourceCodeFromExternalClass("com.ejemplo.ClaseA", project);
-            getLog().info("Código fuente: \n" + sourceCode);
+        // Use CFR decompiler
+        StringWriter writer = new StringWriter();
+
+        OutputSinkFactory mySink = new OutputSinkFactory() {
+            @Override
+            public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> available) {
+                return Arrays.asList(SinkClass.STRING);
+            }
+
+            @Override
+            public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
+                return message -> writer.write(message.toString() + "\n");
+            }
+        };
+
+        CfrDriver driver = new CfrDriver.Builder()
+                .withOutputSink(mySink)
+                .build();
+
+        driver.analyse(Arrays.asList(tempClassFile.getAbsolutePath()));
+
+        return writer.toString();
+    }
+
+
+    private static File extractClassFile(File jarFile, String classPath) throws IOException {
+        try (JarFile jar = new JarFile(jarFile)) {
+            JarEntry entry = jar.getJarEntry(classPath);
+            if (entry == null) {
+                return null;
+            }
+
+            File tempFile = Files.createTempFile("class", ".class").toFile();
+            try (InputStream in = jar.getInputStream(entry);
+                 OutputStream out = new FileOutputStream(tempFile)) {
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
+
+            return tempFile;
         }
     }
 

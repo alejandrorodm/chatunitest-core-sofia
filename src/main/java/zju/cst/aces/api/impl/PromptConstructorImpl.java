@@ -13,6 +13,7 @@ import zju.cst.aces.runner.solution_runner.SofiaRunner;
 import zju.cst.aces.util.TokenCounter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -45,13 +46,11 @@ public class PromptConstructorImpl implements PromptConstructor {
     }
 
     public void setPromptInfoWithDep(ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
-        switch (config.getPhaseType()) {
-            case "SOFIA":
-                this.promptInfo = SofiaRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
-                break;
-            default:
-                this.promptInfo = AbstractRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
-                break;
+        if (config.getPhaseType().equals("SOFIA")) {
+            SofiaRunner.setStaticParams(config);
+            this.promptInfo = SofiaRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
+        } else {
+            this.promptInfo = AbstractRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
         }
     }
 
