@@ -182,11 +182,8 @@ public class SofiaRunner extends MethodRunner {
         // Extract .class from JAR
         File tempClassFile = extractClassFile(jarFile, classPath);
         if (tempClassFile == null) {
-            logger.info("NOT FOUND " + jarFile + " --> " + classPath);
             return null;
         }
-
-        logger.info("FOUND " + jarFile + " --> " + classPath);
 
         // Use CFR decompiler
         StringWriter writer = new StringWriter();

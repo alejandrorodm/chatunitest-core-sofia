@@ -7,7 +7,7 @@ public enum Model {
     GPT_3_5_TURBO("gpt-3.5-turbo", new ModelConfig.Builder()
             .withModelName("gpt-3.5-turbo")
             .withUrl("https://api.gptsapi.net/v1/chat/completions")
-            .withContextLength(4096)
+            .withContextLength(16385)
             .withTemperature(0.5)
             .withFrequencyPenalty(0)
             .withPresencePenalty(0)
