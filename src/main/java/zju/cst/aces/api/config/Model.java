@@ -68,6 +68,14 @@ public enum Model {
             .withTemperature(0.5)
             .withFrequencyPenalty(0)
             .withPresencePenalty(0)
+            .build()),
+    CODESTRAL_2501("codestral-2501", new ModelConfig.Builder()
+            .withModelName("codestral-2501")
+            .withUrl(null)
+            .withContextLength(32000)
+            .withTemperature(0.5)
+            .withFrequencyPenalty(0)
+            .withPresencePenalty(0)
             .build());
 
     private final String modelName;
