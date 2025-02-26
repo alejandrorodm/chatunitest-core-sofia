@@ -166,13 +166,16 @@ public class SofiaRunner extends MethodRunner {
     public static String getSourceCode(String className) throws IOException {
         String classPath = className.replace('.', '/') + ".class";
         for (String dependency : dependencies) {
-
-            File jarFile = new File(dependency);
-            if (jarFile.exists()) {
-                String decompiledClass = decompileClassFromJar(jarFile, classPath);
-                if (decompiledClass != null) {
-                    return decompiledClass;
+            try {
+                File jarFile = new File(dependency);
+                if (jarFile.exists()) {
+                    String decompiledClass = decompileClassFromJar(jarFile, classPath);
+                    if (decompiledClass != null) {
+                        return decompiledClass;
+                    }
                 }
+            } catch(Exception e) {
+                continue;
             }
         }
         return null;
