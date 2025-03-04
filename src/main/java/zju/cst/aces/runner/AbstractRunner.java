@@ -509,7 +509,7 @@ public abstract class AbstractRunner {
     public static boolean runTest(Config config, String fullTestName, PromptInfo promptInfo, int rounds) {
         String testName = fullTestName.substring(fullTestName.lastIndexOf(".") + 1);
         Path savePath;
-        if(config.phaseType.equals("HITS")) {
+        if(config.phaseType.equals("HITS") || config.phaseType.equals("SOFIA_HITS")) {
             savePath = config.getTestOutput().resolve(fullTestName.replace(".", File.separator) + "_slice" + promptInfo.getSliceNum() + ".java"); // todo 这里要加上切片序号
         } else {
             savePath = config.getTestOutput().resolve(fullTestName.replace(".", File.separator) + ".java"); // todo 这里要加上切片序号

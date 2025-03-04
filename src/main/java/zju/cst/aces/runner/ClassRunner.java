@@ -7,6 +7,7 @@ import zju.cst.aces.runner.solution_runner.ChatTesterRunner;
 import zju.cst.aces.runner.solution_runner.HITSRunner;
 import zju.cst.aces.runner.solution_runner.MUTAPRunner;
 import zju.cst.aces.runner.solution_runner.SofiaRunner;
+import zju.cst.aces.runner.solution_runner.SofiaHitsRunner;
 import zju.cst.aces.util.Counter;
 import zju.cst.aces.util.TestClassMerger;
 import zju.cst.aces.util.ClassNameProcessor;
@@ -115,6 +116,9 @@ public class ClassRunner extends AbstractRunner {
                 break;
             case "SOFIA":
                 new SofiaRunner(config, fullClassName, methodInfo).start();
+                break;
+            case "SOFIA_HITS":
+                new SofiaHitsRunner(config, fullClassName, methodInfo).start();
                 break;
             default:
                 new MethodRunner(config, fullClassName, methodInfo).start();

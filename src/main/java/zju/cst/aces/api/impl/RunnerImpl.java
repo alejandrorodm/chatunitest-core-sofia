@@ -6,6 +6,7 @@ import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.prompt.PromptFile;
 import zju.cst.aces.runner.ClassRunner;
 import zju.cst.aces.runner.MethodRunner;
+import zju.cst.aces.runner.solution_runner.SofiaHitsRunner;
 import zju.cst.aces.runner.solution_runner.SofiaRunner;
 import zju.cst.aces.runner.solution_runner.ChatTesterRunner;
 import zju.cst.aces.runner.solution_runner.HITSRunner;
@@ -46,6 +47,9 @@ public class RunnerImpl implements Runner {
                 break;
             case "SOFIA":
                 new SofiaRunner(config, fullClassName, methodInfo).start();
+                break;
+            case "SOFIA_HITS":
+                new SofiaHitsRunner(config, fullClassName, methodInfo).start();
                 break;
             default:
                 new MethodRunner(config, fullClassName, methodInfo).start();
