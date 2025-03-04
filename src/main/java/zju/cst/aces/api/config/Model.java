@@ -72,7 +72,7 @@ public enum Model {
     CODESTRAL_2501("codestral-2501", new ModelConfig.Builder()
             .withModelName("codestral-2501")
             .withUrl(null)
-            .withContextLength(32000)
+            .withContextLength(256000)
             .withTemperature(0.5)
             .withFrequencyPenalty(0)
             .withPresencePenalty(0)
