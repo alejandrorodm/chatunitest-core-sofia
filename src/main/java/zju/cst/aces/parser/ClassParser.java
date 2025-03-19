@@ -27,6 +27,7 @@ import zju.cst.aces.api.Project;
 import zju.cst.aces.dto.ClassInfo;
 import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.OCM;
+import zju.cst.aces.parser.EmbeddingClient;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -50,6 +51,7 @@ public class ClassParser {
     AtomicInteger sharedInteger;
     Map<String, Map<String, String>> classMapping;
     OCM ocm;
+    EmbeddingClient embeddingClient = new EmbeddingClient();
 
     public ClassParser(JavaParser javaParser, Project project, Path path,
                        Logger logger, Gson gson, AtomicInteger sharedInteger,
@@ -189,6 +191,11 @@ public class ClassParser {
         mi.setPublic(isPublic(node));
         mi.setBoolean(isBoolean(node));
         mi.setAbstract(node.isAbstract());
+
+        embeddingClient.saveCode(mi.className, mi.methodName, mi.sourceCode, mi.methodSignature, mi.method_comment, List.of(mi.method_annotation));
+
+        // DONDE SE ENCUENTRAN LAS CABECERAS DE LOS METODOS?
+
 //        findObjectConstructionCode(cu, node);
 //        if (node instanceof MethodDeclaration) {
 //            findObjectConstructionCode(cu, node.asMethodDeclaration());
