@@ -37,7 +37,11 @@ def save_code():
     try:
         data = request.json
         class_name = data.get('class_name')
+        method_name = data.get('method_name')
         code = data.get('code')
+        signature = data.get('signature')
+        comment = data.get('comment')
+        annotations = data.get('annotations')
 
         if not class_name or not code:
             return jsonify({'error': 'Missing class name or code'}), 400
@@ -49,11 +53,13 @@ def save_code():
             collection.add(
                 ids=[class_name],
                 embeddings=[embedding],
-                metadatas=[{"code": code}]
+                metadatas=[{"code": code, "method_name": method_name, "signature": signature, "comment": comment, "annotations": annotations}]
             )
         except Exception as e:
+            print(f"Error en el guardado en la base de datos: {e}")
             return jsonify({'Error en el guardado en la base de datos': str(e)}), 500
         else:
+            print(f"Código {method_name} con {signature} guardado correctamente")
             return jsonify({'message': 'Code saved successfully'})
     except Exception as e:
         print(f"Error interno: {e}")
