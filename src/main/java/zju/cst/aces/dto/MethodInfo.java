@@ -39,5 +39,26 @@ public class MethodInfo {
         this.method_annotation=method_annotation;
     }
 
+    @Override
+    public String toString() {
+        return "MethodInfo{" +
+                "className='" + className + '\'' +
+                ", methodName='" + methodName + '\'' +
+                ", brief='" + brief + '\'' +
+                ", methodSignature='" + methodSignature + '\'' +
+                ", sourceCode='" + sourceCode + '\'' +
+                ", useField=" + useField +
+                ", isConstructor=" + isConstructor +
+                ", isGetSet=" + isGetSet +
+                ", isPublic=" + isPublic +
+                ", isBoolean=" + isBoolean +
+                ", isAbstract=" + isAbstract +
+                ", parameters=" + parameters +
+                ", dependentMethods=" + dependentMethods +
+                ", full_method_info='" + full_method_info + '\'' +
+                ", method_comment='" + method_comment + '\'' +
+                ", method_annotation='" + method_annotation + '\'' +
+                '}';
+    }
 
 }

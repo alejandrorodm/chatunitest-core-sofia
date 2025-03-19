@@ -101,4 +101,36 @@ public class PromptInfo {
     public void addRecord(RoundRecord r) {
         this.records.add(r);
     }
+
+    @Override
+    public String toString() {
+        return "PromptInfo{" +
+                "hasDep=" + hasDep +
+                ", fullClassName='" + fullClassName + '\'' +
+                ", className='" + className + '\'' +
+                ", methodName='" + methodName + '\'' +
+                ", methodSignature='" + methodSignature + '\'' +
+                ", context='" + context + '\'' +
+                ", otherMethodBrief='" + otherMethodBrief + '\'' +
+                ", otherMethodBodies='" + otherMethodBodies + '\'' +
+                ", constructorDeps=" + constructorDeps +
+                ", methodDeps=" + methodDeps +
+                ", errorMsg=" + errorMsg +
+                ", unitTest='" + unitTest + '\'' +
+                ", fullTestName='" + fullTestName + '\'' +
+                ", testPath=" + testPath +
+                ", correctTests=" + correctTests +
+                ", testNum=" + testNum +
+                ", round=" + round +
+                ", records=" + records +
+                ", methodInfo=" + methodInfo +
+                ", classInfo=" + classInfo +
+                ", methodSlicePath=" + methodSlicePath +
+                ", sliceNum=" + sliceNum +
+                ", sliceStep=" + sliceStep +
+                ", coverage=" + coverage +
+                ", coverage_improve_time=" + coverage_improve_time +
+                ", max_coverage_test_code='" + max_coverage_test_code + '\'' +
+                '}';
+    }
 }
