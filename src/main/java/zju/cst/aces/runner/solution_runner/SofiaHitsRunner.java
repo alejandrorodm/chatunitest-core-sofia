@@ -22,6 +22,7 @@ import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.PromptInfo;
 import zju.cst.aces.runner.MethodRunner;
 import zju.cst.aces.util.JsonResponseProcessor;
+import zju.cst.aces.parser.EmbeddingClient;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -37,6 +39,7 @@ public class SofiaHitsRunner extends MethodRunner {
 
     private static List<String> dependencies;
     private static Logger logger;
+    private static EmbeddingClient embeddingClient = new EmbeddingClient();
 
     public SofiaHitsRunner(Config config, String fullClassName, MethodInfo methodInfo) throws IOException {
         super(config, fullClassName, methodInfo);
@@ -122,6 +125,7 @@ public class SofiaHitsRunner extends MethodRunner {
     }
 
     public static PromptInfo generatePromptInfoWithDep(Config config, ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
+
         PromptInfo promptInfo = new PromptInfo(
                 true,
                 classInfo.fullClassName,
@@ -129,8 +133,8 @@ public class SofiaHitsRunner extends MethodRunner {
                 methodInfo.methodSignature);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
-        List<String> otherBriefMethods = new ArrayList<>();
-        List<String> otherMethodBodies = new ArrayList<>();
+        // List<String> otherBriefMethods = new ArrayList<>();
+        // List<String> otherMethodBodies = new ArrayList<>();
 
         for (Map.Entry<String, Set<String>> entry : classInfo.constructorDeps.entrySet()) {
             String depClassName = entry.getKey();
@@ -142,26 +146,26 @@ public class SofiaHitsRunner extends MethodRunner {
             promptInfo.addConstructorDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
         }
 
-        for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
-            String depClassName = entry.getKey();
-            if (depClassName.equals(classInfo.getClassName())) {
-                Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
-                for (String otherMethod : otherSig) {
-                    MethodInfo otherMethodInfo = getMethodInfo(config, classInfo, otherMethod);
-                    if (otherMethodInfo == null) {
-                        continue;
-                    }
-                    // only add the methods in focal class that are invoked
-                    otherBriefMethods.add(otherMethodInfo.brief);
-                    otherMethodBodies.add(otherMethodInfo.sourceCode);
-                }
-                continue;
-            }
+        // for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
+        //     String depClassName = entry.getKey();
+        //     if (depClassName.equals(classInfo.getClassName())) {
+        //         Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
+        //         for (String otherMethod : otherSig) {
+        //             MethodInfo otherMethodInfo = getMethodInfo(config, classInfo, otherMethod);
+        //             if (otherMethodInfo == null) {
+        //                 continue;
+        //             }
+        //             // only add the methods in focal class that are invoked
+        //             otherBriefMethods.add(otherMethodInfo.brief);
+        //             otherMethodBodies.add(otherMethodInfo.sourceCode);
+        //         }
+        //         continue;
+        //     }
 
-            Set<String> depMethods = entry.getValue();
-            promptInfo.addMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
-            addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
-        }
+        //     Set<String> depMethods = entry.getValue();
+        //     promptInfo.addMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
+        //     addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
+        // }
 
         String fields = joinLines(classInfo.fields);
         String imports = joinLines(classInfo.imports);
@@ -171,28 +175,46 @@ public class SofiaHitsRunner extends MethodRunner {
                 + "\n" + classInfo.classSignature
                 + " {\n";
         //TODO: handle used fields instead of all fields
-        String otherMethods = "";
-        String otherFullMethods = "";
-        if (classInfo.hasConstructor) {
-            otherMethods += joinLines(classInfo.constructorBrief) + "\n";
-            otherFullMethods += getBodies(config, classInfo, classInfo.constructorSigs) + "\n";
-        }
+        // String otherMethods = "";
+        // String otherFullMethods = "";
+
+
+
+        // if (classInfo.hasConstructor) {
+        //     otherMethods += joinLines(classInfo.constructorBrief) + "\n";
+        //     otherFullMethods += getBodies(config, classInfo, classInfo.constructorSigs) + "\n";
+        // }
 //        if (methodInfo.useField) {
 //            information += fields + "\n";
 //            otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
 //            otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
 //        }
         information += fields + "\n";
-        otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
-        otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
+        // otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
+        // otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
 
-        otherMethods += joinLines(otherBriefMethods) + "\n";
-        otherFullMethods += joinLines(otherMethodBodies) + "\n";
-        information += methodInfo.sourceCode + "\n}";
-
+        // otherMethods += joinLines(otherBriefMethods) + "\n";
+        // otherFullMethods += joinLines(otherMethodBodies) + "\n";
+        // information += methodInfo.sourceCode + "\n}";
+        information += embeddingClient.searchCode(methodInfo.sourceCode, 3);
         promptInfo.setContext(information);
-        promptInfo.setOtherMethodBrief(otherMethods);
-        promptInfo.setOtherMethodBodies(otherFullMethods);
+
+        //meterlo en el contexto es suficiente???
+        promptInfo.setOtherMethodBrief(""); 
+        promptInfo.setOtherMethodBodies("");
+        
+        //promptInfo.setOtherMethodBrief(otherMethods); 
+        //promptInfo.setOtherMethodBodies(otherFullMethods);
+
+        // Write the promptInfo to a file
+        Path promptsFilePath = Path.of("prompts.txt");
+        try (BufferedWriter writer = Files.newBufferedWriter(promptsFilePath, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            writer.write(promptInfo.toString());
+            writer.newLine();
+        } catch (IOException e) {
+            logger.error("Failed to write promptInfo to file");
+        }
+
         return promptInfo;
     }
 
