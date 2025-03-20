@@ -54,7 +54,7 @@ public class EmbeddingClient {
         // } catch (IOException e) {
         //     System.out.println("Error al iniciar el servidor Flask: " + e.getMessage());
         // }
-        System.out.println("El servidor FLask ya está corriendo.");
+        System.out.println("El servidor Flask ya está corriendo.");
     }
 
     private String sendPostRequest(String endpoint, String inputJson) {
@@ -137,9 +137,11 @@ public class EmbeddingClient {
         return results;
     }
 
-    public List<String> searchCode(String query, int maxNeighbors) {
+    public List<String> searchCode(String class_name, String method_name, String code, int maxNeighbors) {
         String inputJson = new JSONObject()
-                .put("query", query)
+                .put("class_name", class_name)
+                .put("method_name", method_name)
+                .put("code", code)
                 .toString();
     
         String response = sendPostRequest("search_code", inputJson);
@@ -163,9 +165,9 @@ public class EmbeddingClient {
                 if (codes != null) {
                     System.out.println("Códigos similares encontrados:");
                     for (int i = 0; i < Math.min(codes.length(), maxNeighbors); i++) {  // Limitar códigos
-                        String code = codes.getString(i);
-                        results.add(code);
-                        System.out.println(code);
+                        String retrieved_code = codes.getString(i);
+                        results.add(retrieved_code);
+                        System.out.println(retrieved_code);
                     }
                 }
             } else {
@@ -181,12 +183,12 @@ public class EmbeddingClient {
         EmbeddingClient client = new EmbeddingClient();
 
         // Datos de prueba para inserciones
-        // String className1 = "ExampleClass";
-        // String methodName1 = "exampleMethod";
-        // String code1 = "public void exampleMethod() { System.out.println(\"¡Hola mundo!\"); }";
-        // String signature1 = "public void exampleMethod()";
-        // String comment1 = "Este método imprime Hello, world!";
-        // List<String> annotations1 = List.of("@Test", "@Deprecated");
+        String className1 = "ExampleClass";
+        String methodName1 = "exampleMethod";
+        String code1 = "public void exampleMethod() { System.out.println(\\\"¡Hola mundo!\\\"); }";
+        String signature1 = "public void exampleMethod(String cadena)";
+        String comment1 = "Este método imprime Hello, world!";
+        List<String> annotations1 = List.of("@Test", "@Deprecated");
 
         // String className2 = "MathOperations";
         // String methodName2 = "addNumbers";
@@ -225,7 +227,7 @@ public class EmbeddingClient {
         // List<String> annotations6 = List.of("@Override");
 
         // // Guardar los códigos
-        // client.saveCode(className1, methodName1, code1, signature1, comment1, annotations1);
+        client.saveCode(className1, methodName1, code1, signature1, comment1, annotations1);
         // client.saveCode(className2, methodName2, code2, signature2, comment2, annotations2);
         // client.saveCode(className3, methodName3, code3, signature3, comment3, annotations3);
         // client.saveCode(className4, methodName4, code4, signature4, comment4, annotations4);
@@ -243,9 +245,9 @@ public class EmbeddingClient {
         // System.out.println("Resultados de la búsqueda 2: " + results2);
 
         // Buscar por consulta relacionada con 'maximo valor'
-        System.out.println("Buscando código similar con el método 'bubbleSort'...");
-        List<String> results3 = client.searchCode("print", 5);
-        System.out.println("Resultados de la búsqueda 3: " + results3);
+        System.out.println("Buscando código similar con el método " + methodName1 + "...");
+        List<String> results = client.searchCode(className1, methodName1, code1, 3);
+        System.out.println("Resultados de la búsqueda 3: " + results);
 
         // Terminar el proceso si es necesario
         if (client.process != null) {

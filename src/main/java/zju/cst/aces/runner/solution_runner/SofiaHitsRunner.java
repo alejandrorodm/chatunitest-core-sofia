@@ -176,9 +176,7 @@ public class SofiaHitsRunner extends MethodRunner {
                 + " {\n";
         //TODO: handle used fields instead of all fields
         // String otherMethods = "";
-        // String otherFullMethods = "";
-
-
+        String otherFullMethods = "";
 
         // if (classInfo.hasConstructor) {
         //     otherMethods += joinLines(classInfo.constructorBrief) + "\n";
@@ -196,11 +194,12 @@ public class SofiaHitsRunner extends MethodRunner {
         // otherMethods += joinLines(otherBriefMethods) + "\n";
         // otherFullMethods += joinLines(otherMethodBodies) + "\n";
         // information += methodInfo.sourceCode + "\n}";
-        information += embeddingClient.searchCode(methodInfo.sourceCode, 3);
+
+        otherFullMethods += embeddingClient.searchCode(methodInfo.className, methodInfo.methodName, methodInfo.sourceCode, 6);
         promptInfo.setContext(information);
 
         //meterlo en el contexto es suficiente???
-        promptInfo.setOtherMethodBrief(""); 
+        promptInfo.setOtherMethodBrief(otherFullMethods); 
         promptInfo.setOtherMethodBodies("");
         
         //promptInfo.setOtherMethodBrief(otherMethods); 
@@ -211,6 +210,7 @@ public class SofiaHitsRunner extends MethodRunner {
         try (BufferedWriter writer = Files.newBufferedWriter(promptsFilePath, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
             writer.write(promptInfo.toString());
             writer.newLine();
+            writer.close();
         } catch (IOException e) {
             logger.error("Failed to write promptInfo to file");
         }

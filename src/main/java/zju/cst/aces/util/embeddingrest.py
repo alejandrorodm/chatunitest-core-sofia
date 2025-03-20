@@ -46,14 +46,23 @@ def save_code():
         if not class_name or not code:
             return jsonify({'error': 'Missing class name or code'}), 400
 
-        embedding = generate_embedding(code)
+        embeddings = generate_embedding(code)
+        if embeddings is None:
+            return jsonify({'error': 'Error generating embeddings'}), 500
 
         # Guardar en la base de datos vectorial
         try:
             collection.add(
                 ids=[class_name],
-                embeddings=[embedding],
-                metadatas=[{"code": code, "method_name": method_name, "signature": signature, "comment": comment, "annotations": annotations}]
+                embeddings=[embeddings],
+                metadatas=[{
+                    "class_name": class_name,
+                    "code": code,
+                    "method_name": method_name,
+                    "signature": signature,
+                    "comment": comment,
+                    "annotations": annotations
+                }]
             )
         except Exception as e:
             print(f"Error en el guardado en la base de datos: {e}")
@@ -74,31 +83,51 @@ def search_code():
         class_name = data.get('class_name')
         method_name = data.get('method_name')
         results = None
+        query_embedding = None
         
         if class_name and method_name:
-            print("Se ha encontrado el nombre de la clase y del método")
+            print(f"Se ha encontrado el nombre de la clase {class_name} y del método {method_name}")
             try:
+                
                 results = collection.get(
-                    where={"class_name": class_name, "method_name": method_name}
+                    where={
+                        "$and": [
+                            {"class_name": {"$eq": class_name}},
+                            {"method_name": {"$eq": method_name}}
+                        ]
+                    },
+                    include=["metadatas", "embeddings"]
                 )
+                
             except Exception as e:
-                print("No se han encontrado resultados buscando por el nombre de la clase y metodo")
-
-                try:
-                    code = data.get('code')
-                except:
-                    print("Se ha intentado buscar por embeddings pero no se ha encontrado el código de petición")
-                    return jsonify({'error': 'No matching code found'}), 404
-                else:
-                    query_embedding = generate_embedding(code)
-                    results = collection.query(
-                        query_embeddings=[query_embedding],
-                        n_results=5
-                    )
-            else: 
-                print("Se ha encontrado el código por nombre de clase y método")
+                print("Error en la búsqueda por nombre de clase y método: ", e)
+            else:
                 print(results)
+                print("Se ha encontrado el código por nombre de clase y método")
+                query_embedding = results.get("embeddings")[0]
+                
+        else:
+            print("No se ha encontrado el nombre de la clase y del método")
             
+        if query_embedding is None:
+            print("El embedding del resultado encontrado es nulo. Se generará un nuevo embedding con el código dado")
+            query_embedding = generate_embedding(data.get('code'))
+        else:
+            print("Se ha encontrado un embedding para la búsqueda")
+            
+        try:
+            results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=5
+            )
+        except Exception as e:
+            print("No se ha podido encontrar por código: ", e)
+            return jsonify({'error': 'No matching code found'}), 404
+        else:
+            if not results or not results["ids"]:
+                return jsonify({'error': 'No matching code found'}), 404
+            else:
+                print("Se han encontrado resultados")
     
         # Extraer nombres de clase y códigos encontrados
         matched_classes = results["ids"][0] if results["ids"] else []
