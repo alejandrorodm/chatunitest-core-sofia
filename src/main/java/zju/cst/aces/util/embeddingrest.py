@@ -86,8 +86,7 @@ def search_code():
         signature= data.get('signature')
         results = None
         query_embedding = None
-        code = None
-        
+        max_neighbours = data.get('max_neighbours', 6)        
         
         if class_name and signature:
             print(f"Se ha encontrado el nombre de la clase {class_name} y del método {signature}")
@@ -121,7 +120,7 @@ def search_code():
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=5
+                n_results=max_neighbours
             )
         except Exception as e:
             print("No se ha podido encontrar por código: ", e)

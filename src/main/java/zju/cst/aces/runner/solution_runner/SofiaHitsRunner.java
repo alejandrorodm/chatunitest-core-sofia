@@ -195,7 +195,7 @@ public class SofiaHitsRunner extends MethodRunner {
         // otherFullMethods += joinLines(otherMethodBodies) + "\n";
         // information += methodInfo.sourceCode + "\n}";
 
-        otherFullMethods += embeddingClient.searchCode(methodInfo.className, methodInfo.methodName, methodInfo.sourceCode, 6);
+        otherFullMethods += embeddingClient.searchCode(methodInfo.className, methodInfo.methodSignature, methodInfo.sourceCode, 6);
         promptInfo.setContext(information);
 
         //meterlo en el contexto es suficiente???
