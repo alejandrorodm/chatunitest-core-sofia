@@ -137,10 +137,10 @@ public class EmbeddingClient {
         return results;
     }
 
-    public List<String> searchCode(String class_name, String method_name, String code, int maxNeighbors) {
+    public List<String> searchCode(String class_name, String signature, String code, int maxNeighbors) {
         String inputJson = new JSONObject()
                 .put("class_name", class_name)
-                .put("method_name", method_name)
+                .put("signature", signature)
                 .put("code", code)
                 .toString();
     
@@ -246,7 +246,7 @@ public class EmbeddingClient {
 
         // Buscar por consulta relacionada con 'maximo valor'
         System.out.println("Buscando código similar con el método " + methodName1 + "...");
-        List<String> results = client.searchCode(className1, methodName1, code1, 3);
+        List<String> results = client.searchCode(className1, signature1, code1, 3);
         System.out.println("Resultados de la búsqueda 3: " + results);
 
         // Terminar el proceso si es necesario
