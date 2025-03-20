@@ -71,24 +71,44 @@ def save_code():
 def search_code():
     try:
         data = request.json
-        query = data.get('query')
+        class_name = data.get('class_name')
+        method_name = data.get('method_name')
+        results = None
+        
+        if class_name and method_name:
+            print("Se ha encontrado el nombre de la clase y del método")
+            try:
+                results = collection.get(
+                    where={"class_name": class_name, "method_name": method_name}
+                )
+            except Exception as e:
+                print("No se han encontrado resultados buscando por el nombre de la clase y metodo")
 
-        if not query:
-            return jsonify({'error': 'Missing query'}), 400
-
-        query_embedding = generate_embedding(query)
-
-        # Códigos similares
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=5
-        )
-
+                try:
+                    code = data.get('code')
+                except:
+                    print("Se ha intentado buscar por embeddings pero no se ha encontrado el código de petición")
+                    return jsonify({'error': 'No matching code found'}), 404
+                else:
+                    query_embedding = generate_embedding(code)
+                    results = collection.query(
+                        query_embeddings=[query_embedding],
+                        n_results=5
+                    )
+            else: 
+                print("Se ha encontrado el código por nombre de clase y método")
+                print(results)
+            
+    
         # Extraer nombres de clase y códigos encontrados
         matched_classes = results["ids"][0] if results["ids"] else []
         matched_codes = [meta["code"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-
-        return jsonify({'results': matched_classes, 'codes': matched_codes})
+        matched_methods = [meta["method_name"] for meta in results["metadatas"][0]] if results["metadatas"] else []
+        matched_signatures = [meta["signature"] for meta in results["metadatas"][0]] if results["metadatas"] else []
+        matched_comments = [meta["comment"] for meta in results["metadatas"][0]] if results["metadatas"] else []
+        matched_annotations = [meta["annotations"] for meta in results["metadatas"][0]] if results["metadatas"] else []
+        
+        return jsonify({'results': matched_classes, 'codes': matched_codes, 'methods': matched_methods, 'signatures': matched_signatures, 'comments': matched_comments, 'annotations': matched_annotations})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
