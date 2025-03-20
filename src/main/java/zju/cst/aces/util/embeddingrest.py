@@ -23,9 +23,10 @@ model = AutoModel.from_pretrained("bert-base-uncased")
 def generate_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
-    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
+    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]  # Convierte ndarray a lista
     print("Embeddings generados")
     return embeddings
+
 
 @app.route('/')
 def index():
@@ -47,6 +48,7 @@ def save_code():
             return jsonify({'error': 'Missing class name or code'}), 400
 
         embeddings = generate_embedding(code)
+
         if embeddings is None:
             return jsonify({'error': 'Error generating embeddings'}), 500
 
@@ -92,29 +94,18 @@ def search_code():
             try:
                 
                 results = collection.get(
-                    ids=[class_name],
+                    where={
+                        "$and": [
+                            {"class_name": {"$eq": class_name}},
+                            {"signature": {"$eq": signature}}
+                        ]
+                    },
                     include=["metadatas", "embeddings"]
                 )
+                
+                query_embedding = results["embeddings"]
+                query_embedding = query_embedding.tolist()[0]  # Convierte el ndarray a lista estándar
 
-                # Ahora filtramos los resultados manualmente por el método y la firma
-                if results["metadatas"]:
-                    for meta in results["metadatas"]:
-                        print(meta.get("class_name"), meta.get("signature"))
-                        if (
-                            meta.get("class_name") == class_name
-                            and meta.get("signature") == signature
-                        ):
-                            print("✅ Código encontrado:", meta)
-                            query_embedding = meta.get("embeddings")
-
-                            if query_embedding is None:
-                                query_embedding = generate_embedding(meta.get("code"))
-                            
-                            break
-                    else:
-                        print("❌ No se encontró el código con ese método y firma")
-                else:
-                    print("❌ No se encontró la clase")
                 
             except Exception as e:
                 print("Error en la búsqueda por nombre de clase y método: ", e)
