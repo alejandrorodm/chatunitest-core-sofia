@@ -192,7 +192,14 @@ public class ClassParser {
         mi.setBoolean(isBoolean(node));
         mi.setAbstract(node.isAbstract());
 
-        embeddingClient.saveCode(mi.className, mi.methodName, mi.sourceCode, mi.methodSignature, mi.method_comment, List.of(mi.method_annotation));
+        embeddingClient.saveCode(
+            mi.className, 
+            mi.methodName, 
+            mi.sourceCode, 
+            mi.methodSignature, 
+            mi.method_comment, 
+            List.of(mi.method_annotation)
+            );
 
         // DONDE SE ENCUENTRAN LAS CABECERAS DE LOS METODOS?
 

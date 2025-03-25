@@ -125,7 +125,6 @@ public class SofiaHitsRunner extends MethodRunner {
     }
 
     public static PromptInfo generatePromptInfoWithDep(Config config, ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
-
         PromptInfo promptInfo = new PromptInfo(
                 true,
                 classInfo.fullClassName,
@@ -133,90 +132,92 @@ public class SofiaHitsRunner extends MethodRunner {
                 methodInfo.methodSignature);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
-        // List<String> otherBriefMethods = new ArrayList<>();
-        // List<String> otherMethodBodies = new ArrayList<>();
-
-        for (Map.Entry<String, Set<String>> entry : classInfo.constructorDeps.entrySet()) {
-            String depClassName = entry.getKey();
-            Set<String> depMethods = entry.getValue();
-            if (methodInfo.dependentMethods.containsKey(depClassName)) {
-                continue;
+    
+        List<String> otherBriefMethods = new ArrayList<>();
+        List<String> otherMethodBodies = new ArrayList<>();
+    
+        // Agregando RAG - obtener métodos vecinos relevantes
+        List<Map<String, String>> neighbors = embeddingClient.searchCode(
+                methodInfo.className,
+                methodInfo.methodSignature,
+                methodInfo.sourceCode,
+                6);
+    
+        for (Map<String, String> neighbor : neighbors) {
+            String neighborCode = neighbor.get("code");
+            String neighborComment = neighbor.get("comment");
+            String neighborSignature = neighbor.get("signature");
+            boolean isPrivate = neighborSignature.contains("private");
+    
+            if (isPrivate) {
+                otherBriefMethods.add("// [Context Only: Private Method] " + neighborComment + "\n" + neighborSignature);
+                otherMethodBodies.add("// This is a private method and cannot be accessed directly.\n" + neighborCode);
+            } else {
+                otherBriefMethods.add("// " + neighborComment + "\n" + neighborSignature);
+                otherMethodBodies.add(neighborCode);
             }
 
-            promptInfo.addConstructorDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
+        }for (Map<String, String> neighbor : neighbors) {
+            String neighborCode = neighbor.get("code");
+            String neighborComment = neighbor.get("comment");
+            String neighborSignature = neighbor.get("signature");
+            boolean isPrivate = neighborSignature.trim().startsWith("private");
+    
+            if (isPrivate) {
+                otherBriefMethods.add("// [Context Only: Private Method] " + neighborComment + "\n" + neighborSignature);
+                otherMethodBodies.add("// This is a private method and cannot be accessed directly.\n" + neighborCode);
+            } else {
+                otherBriefMethods.add("// " + neighborComment + "\n" + neighborSignature);
+                otherMethodBodies.add(neighborCode);
+            }
         }
-
-        // for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
-        //     String depClassName = entry.getKey();
-        //     if (depClassName.equals(classInfo.getClassName())) {
-        //         Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
-        //         for (String otherMethod : otherSig) {
-        //             MethodInfo otherMethodInfo = getMethodInfo(config, classInfo, otherMethod);
-        //             if (otherMethodInfo == null) {
-        //                 continue;
-        //             }
-        //             // only add the methods in focal class that are invoked
-        //             otherBriefMethods.add(otherMethodInfo.brief);
-        //             otherMethodBodies.add(otherMethodInfo.sourceCode);
-        //         }
-        //         continue;
-        //     }
-
-        //     Set<String> depMethods = entry.getValue();
-        //     promptInfo.addMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
-        //     addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
-        // }
-
+    
+        // Procesar las dependencias originales
+        for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
+            String depClassName = entry.getKey();
+            Set<String> depMethods = entry.getValue();
+            promptInfo.addMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
+        }
+    
         String fields = joinLines(classInfo.fields);
         String imports = joinLines(classInfo.imports);
-
-        String information = classInfo.packageName
-                + "\n" + imports
-                + "\n" + classInfo.classSignature
-                + " {\n";
-        //TODO: handle used fields instead of all fields
-        // String otherMethods = "";
-        String otherFullMethods = "";
-
-        // if (classInfo.hasConstructor) {
-        //     otherMethods += joinLines(classInfo.constructorBrief) + "\n";
-        //     otherFullMethods += getBodies(config, classInfo, classInfo.constructorSigs) + "\n";
-        // }
-//        if (methodInfo.useField) {
-//            information += fields + "\n";
-//            otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
-//            otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
-//        }
-        information += fields + "\n";
-        // otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
-        // otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
-
-        // otherMethods += joinLines(otherBriefMethods) + "\n";
-        // otherFullMethods += joinLines(otherMethodBodies) + "\n";
-        // information += methodInfo.sourceCode + "\n}";
-
-        otherFullMethods += embeddingClient.searchCode(methodInfo.className, methodInfo.methodSignature, methodInfo.sourceCode, 6);
-        promptInfo.setContext(information);
-
-        //meterlo en el contexto es suficiente???
-        promptInfo.setOtherMethodBrief(otherFullMethods); 
-        promptInfo.setOtherMethodBodies("");
-        
-        //promptInfo.setOtherMethodBrief(otherMethods); 
-        //promptInfo.setOtherMethodBodies(otherFullMethods);
-
-        // Write the promptInfo to a file
-        Path promptsFilePath = Path.of("prompts.txt");
-        try (BufferedWriter writer = Files.newBufferedWriter(promptsFilePath, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-            writer.write(promptInfo.toString());
-            writer.newLine();
-            writer.close();
-        } catch (IOException e) {
-            logger.error("Failed to write promptInfo to file");
-        }
-
+    
+        String information = classInfo.packageName + "\n" + imports + "\n" + classInfo.classSignature + " {\n";
+    
+        String otherMethods = joinLines(otherBriefMethods) + "\n";
+        String otherFullMethods = joinLines(otherMethodBodies) + "\n";
+    
+        information += fields + "\n" + methodInfo.sourceCode + "\n}";
+    
+        // Mejorando el contexto con vecinos
+        promptInfo.setContext(information + "\n// RAG Neighbors (Enriched):\n" + otherFullMethods);
+        promptInfo.setOtherMethodBrief(otherMethods);
+        promptInfo.setOtherMethodBodies(otherFullMethods);
+    
         return promptInfo;
     }
+    
+    // Nueva función para enriquecer validación con contexto RAG
+    // public boolean validateWithRAG(PromptConstructorImpl pc) {
+    //     PromptInfo promptInfo = pc.getPromptInfo();
+    //     logger.info("Validando con contexto extendido RAG");
+    
+    //     List<Map<String, String>> neighbors = embeddingClient.searchCode(
+    //             promptInfo.getClassInfo().fullClassName,
+    //             promptInfo.getMethodInfo().methodSignature,
+    //             promptInfo.getMethodInfo().sourceCode,
+    //             4);
+    
+    //     for (Map<String, String> neighbor : neighbors) {
+    //         String neighborCode = neighbor.get("code");
+    //         logger.info("Validando contra código vecino:\n" + neighborCode);
+    //         if (neighborCode.contains("@Test") && neighborCode.contains("assert")) {
+    //             logger.info("Test vecino identificado, ajustando validación.");
+    //             return true;
+    //         }
+    //     }
+    //     return false;
+    // }
 
     public static String getDepInfo(Config config, String depClassName, Set<String> depMethods) throws IOException {
         ClassInfo depClassInfo = getClassInfo(config, depClassName);

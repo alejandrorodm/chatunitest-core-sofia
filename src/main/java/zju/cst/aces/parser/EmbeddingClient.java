@@ -7,7 +7,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -137,44 +139,39 @@ public class EmbeddingClient {
         return results;
     }
 
-    public List<String> searchCode(String class_name, String signature, String code, int maxNeighbors) {
+    public List<Map<String, String>> searchCode(String className, String signature, String sourceCode, int limit) {
         String inputJson = new JSONObject()
-                .put("class_name", class_name)
+                .put("class_name", className)
                 .put("signature", signature)
-                .put("code", code)
+                .put("code", sourceCode)
+                .put("max_neighbours", limit)
                 .toString();
-    
+
         String response = sendPostRequest("search_code", inputJson);
-        List<String> results = new ArrayList<>();
-    
+        List<Map<String, String>> results = new ArrayList<>();
+
         if (response != null) {
             JSONObject jsonResponse = new JSONObject(response);
-    
+
             if (jsonResponse.has("results")) {
                 JSONArray jsonResults = jsonResponse.getJSONArray("results");
-                System.out.println("Resultados encontrados: " + jsonResults.length());
-                if (jsonResults.length() > maxNeighbors) {
-                    System.out.println("Mostrando solo los primeros " + maxNeighbors + " resultados.");
-                }
-                for (int i = 0; i < Math.min(jsonResults.length(), maxNeighbors); i++) {  // Limitar resultados
-                    results.add(jsonResults.getString(i));
-                }
-    
-                // Si hay códigos adicionales en la respuesta
-                JSONArray codes = jsonResponse.optJSONArray("codes");
-                if (codes != null) {
-                    System.out.println("Códigos similares encontrados:");
-                    for (int i = 0; i < Math.min(codes.length(), maxNeighbors); i++) {  // Limitar códigos
-                        String retrieved_code = codes.getString(i);
-                        results.add(retrieved_code);
-                        System.out.println(retrieved_code);
-                    }
+                for (int i = 0; i < jsonResults.length(); i++) {
+                    JSONObject result = jsonResults.getJSONObject(i);
+                    Map<String, String> neighborData = new HashMap<>();
+                    neighborData.put("class_name", result.optString("class_name", ""));
+                    neighborData.put("method_name", result.optString("method_name", ""));
+                    neighborData.put("signature", result.optString("signature", ""));
+                    neighborData.put("code", result.optString("code", ""));
+                    neighborData.put("comment", result.optString("comment", ""));
+                    neighborData.put("annotations", result.optString("annotations", ""));
+
+                    results.add(neighborData);
                 }
             } else {
                 System.out.println("No se encontraron resultados.");
             }
         }
-    
+
         return results;
     }
     
@@ -246,7 +243,7 @@ public class EmbeddingClient {
 
         // Buscar por consulta relacionada con 'maximo valor'
         System.out.println("Buscando código similar con el método " + methodName1 + "...");
-        List<String> results = client.searchCode(className1, signature1, code1, 3);
+        List<Map<String, String>> results = client.searchCode(className1, signature1, code1, 3);
         System.out.println("Resultados de la búsqueda 3: " + results);
 
         // Terminar el proceso si es necesario

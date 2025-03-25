@@ -2,15 +2,17 @@ from flask import Flask, request, jsonify
 from transformers import AutoTokenizer, AutoModel
 import torch
 import chromadb
+from waitress import serve
+import os
+# Crear el directorio si no existe
+if not os.path.exists("./chroma_data"):
+    os.makedirs("./chroma_data")
 
 app = Flask(__name__)
 
 # Chroma with persistency
-chroma_client = chromadb.Client(
-    chromadb.config.Settings(
-        persist_directory="./chroma_data"  # Carpeta donde guardamos los datos
-    )
-)
+chroma_client = chromadb.PersistentClient()
+
 
 collection = chroma_client.get_or_create_collection(name="codebase")
 
@@ -52,10 +54,12 @@ def save_code():
         if embeddings is None:
             return jsonify({'error': 'Error generating embeddings'}), 500
 
+        id = class_name + signature
+        
         # Guardar en la base de datos vectorial
         try:
             collection.add(
-                ids=[class_name],
+                ids=[id],
                 embeddings=[embeddings],
                 metadatas=[{
                     "class_name": class_name,
@@ -83,15 +87,16 @@ def search_code():
     try:
         data = request.json
         class_name = data.get('class_name')
-        signature= data.get('signature')
+        signature = data.get('signature')
+        max_neighbours = data.get('max_neighbours', 8)
+        similarity_threshold = 0.7
+
         results = None
         query_embedding = None
-        max_neighbours = data.get('max_neighbours', 6)        
-        
+
+        # Búsqueda inicial por clase y firma
         if class_name and signature:
-            print(f"Se ha encontrado el nombre de la clase {class_name} y del método {signature}")
             try:
-                
                 results = collection.get(
                     where={
                         "$and": [
@@ -101,49 +106,58 @@ def search_code():
                     },
                     include=["metadatas", "embeddings"]
                 )
-                
                 query_embedding = results["embeddings"]
-                query_embedding = query_embedding.tolist()[0]  # Convierte el ndarray a lista estándar
-
-                
+                query_embedding = query_embedding.tolist()[0]
             except Exception as e:
                 print("Error en la búsqueda por nombre de clase y método: ", e)
-            else:
-                print("Embedding del código encontrado:", query_embedding)                
-        else:
-            print("No se ha encontrado el nombre de la clase y del método")
-            
+                query_embedding = None
+
+        # Si no encuentra, generamos embedding nuevo
         if query_embedding is None:
-            print("El embedding del resultado encontrado es nulo. Se generará un nuevo embedding con el código dado")
             query_embedding = generate_embedding(data.get('code'))
-            
+
+        # Búsqueda de vecinos cercanos
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=max_neighbours
+                n_results=max_neighbours,
+                include=["metadatas", "distances"]
             )
         except Exception as e:
             print("No se ha podido encontrar por código: ", e)
             return jsonify({'error': 'No matching code found'}), 404
-        else:
-            if not results or not results["ids"]:
-                return jsonify({'error': 'No matching code found'}), 404
-            else:
-                print("Se han encontrado resultados")
-    
-        # Extraer nombres de clase y códigos encontrados
-        matched_classes = results["ids"][0] if results["ids"] else []
-        matched_codes = [meta["code"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-        matched_methods = [meta["method_name"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-        matched_signatures = [meta["signature"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-        matched_comments = [meta["comment"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-        matched_annotations = [meta["annotations"] for meta in results["metadatas"][0]] if results["metadatas"] else []
-        
-        return jsonify({'results': matched_classes, 'codes': matched_codes, 'methods': matched_methods, 'signatures': matched_signatures, 'comments': matched_comments, 'annotations': matched_annotations})
+
+        # Empaquetamos los resultados en objetos completos
+        matched_results = []
+        if results and results["metadatas"]:
+            neighbors = zip(results["metadatas"][0], results["distances"][0])
+            sorted_neighbors = sorted(neighbors, key=lambda x: x[1])
+
+            for meta, distance in sorted_neighbors:
+                similarity = 1 - distance
+                print(f"Similitud: {similarity}")
+                if similarity < similarity_threshold or len(matched_results) >= max_neighbours:
+                    break
+                matched_results.append({
+                    "class_name": meta.get("class_name"),
+                    "method_name": meta.get("method_name"),
+                    "signature": meta.get("signature"),
+                    "code": meta.get("code"),
+                    "comment": meta.get("comment"),
+                    "annotations": meta.get("annotations"),
+                    "similarity": round(similarity, 2)
+                })
+
+        if not matched_results:
+            return jsonify({'error': 'No matching code found'}), 404
+
+        return jsonify({'results': matched_results})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    #app.run(debug=True, host='0.0.0.0', port=5000)
+    serve(app=app, host='127.0.0.1', port=5000)
