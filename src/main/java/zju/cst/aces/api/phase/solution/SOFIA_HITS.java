@@ -96,7 +96,7 @@ public class SOFIA_HITS extends PhaseImpl {
                 Obfuscator obfuscator = new Obfuscator(config);
                 PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
                 obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
-                prompt = promptGenerator.generateMessages(obfuscatedPromptInfo, "HITS");
+                prompt = promptGenerator.generateMessages(obfuscatedPromptInfo, "SOFIA_HITS");
                 code = generateTest(prompt, record);
                 if (!record.isHasCode()) {
                     promptInfo.setUnitTest("");
@@ -104,7 +104,7 @@ public class SOFIA_HITS extends PhaseImpl {
                 }
                 code = obfuscator.deobfuscateJava(code);
             } else {
-                prompt = promptGenerator.generateMessages(promptInfo, "HITS");
+                prompt = promptGenerator.generateMessages(promptInfo, "SOFIA_HITS");
                 code = generateTest(prompt, record);
                 if (!record.isHasCode()) {
                     promptInfo.setUnitTest("");
