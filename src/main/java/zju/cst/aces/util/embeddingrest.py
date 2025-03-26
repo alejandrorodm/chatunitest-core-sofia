@@ -4,6 +4,8 @@ import torch
 import chromadb
 from waitress import serve
 import os
+import numpy as np
+
 # Crear el directorio si no existe
 if not os.path.exists("./chroma_data"):
     os.makedirs("./chroma_data")
@@ -94,7 +96,7 @@ def search_code():
         results = None
         query_embedding = None
 
-        # Búsqueda inicial por clase y firma
+        # Initial search by class name and method signature
         if class_name and signature:
             try:
                 results = collection.get(
@@ -112,16 +114,16 @@ def search_code():
                 print("Error en la búsqueda por nombre de clase y método: ", e)
                 query_embedding = None
 
-        # Si no encuentra, generamos embedding nuevo
+        # If not found, search by embedding the code
         if query_embedding is None:
             query_embedding = generate_embedding(data.get('code'))
 
-        # Búsqueda de vecinos cercanos
+        # Search by near embeddings
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
                 n_results=max_neighbours,
-                include=["metadatas", "distances"]
+                include=["metadatas", "embeddings"]
             )
         except Exception as e:
             print("No se ha podido encontrar por código: ", e)
@@ -130,14 +132,20 @@ def search_code():
         # Empaquetamos los resultados en objetos completos
         matched_results = []
         if results and results["metadatas"]:
-            neighbors = zip(results["metadatas"][0], results["distances"][0])
-            sorted_neighbors = sorted(neighbors, key=lambda x: x[1])
+            neighbors = zip(results["metadatas"][0], results["embeddings"][0])
+            
+            # Calculamos la similitud del coseno
+            import numpy as np
+            def cosine_similarity(vec1, vec2):
+                return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
-            for meta, distance in sorted_neighbors:
-                similarity = 1 - distance
-                print(f"Similitud: {similarity}")
-                if similarity < similarity_threshold or len(matched_results) >= max_neighbours:
-                    break
+            for meta, neighbor_embedding in neighbors:
+                similarity = cosine_similarity(query_embedding, neighbor_embedding)
+                print(f"Similitud: {similarity:.2f}")
+                
+                if similarity < similarity_threshold or similarity >= 1:
+                    continue
+
                 matched_results.append({
                     "class_name": meta.get("class_name"),
                     "method_name": meta.get("method_name"),
@@ -148,6 +156,9 @@ def search_code():
                     "similarity": round(similarity, 2)
                 })
 
+                if len(matched_results) >= max_neighbours:
+                    break
+
         if not matched_results:
             return jsonify({'error': 'No matching code found'}), 404
 
@@ -155,6 +166,7 @@ def search_code():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 
 
