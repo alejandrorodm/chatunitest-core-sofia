@@ -152,7 +152,9 @@ public class SofiaHitsRunner extends MethodRunner {
                 Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
                 for (String otherMethod : otherSig) {
                     MethodInfo otherMethodInfo = getMethodInfo(config, classInfo, otherMethod);
-                    if (otherMethodInfo == null) continue;
+                    if (otherMethodInfo == null){ 
+                        continue;
+                    }
                     otherBriefMethods.add(otherMethodInfo.brief);
                     otherMethodBodies.add(otherMethodInfo.sourceCode);
                 }
@@ -165,23 +167,7 @@ public class SofiaHitsRunner extends MethodRunner {
     
         String fields = joinLines(classInfo.fields);
         String imports = joinLines(classInfo.imports);
-    
-        // Agregar RAG: Buscar métodos vecinos relevantes
-        List<Map<String, String>> neighbors = embeddingClient.searchCode(
-                methodInfo.className,
-                methodInfo.methodSignature,
-                methodInfo.sourceCode,
-                8 // Ajustamos a 8 vecinos
-        );
-    
-        List<String> ragMethods = new ArrayList<>();
-        for (Map<String, String> neighbor : neighbors) {
-            String neighborCode = neighbor.get("code");
-            String neighborComment = neighbor.get("comment");
-            String neighborSignature = neighbor.get("signature");
-            ragMethods.add("// [RAG] " + neighborComment + "\n" + neighborSignature + "\n" + neighborCode);
-        }
-    
+
         String information = classInfo.packageName
                 + "\n" + imports
                 + "\n" + classInfo.classSignature
@@ -194,21 +180,35 @@ public class SofiaHitsRunner extends MethodRunner {
             otherMethods += joinLines(classInfo.constructorBrief) + "\n";
             otherFullMethods += getBodies(config, classInfo, classInfo.constructorSigs) + "\n";
         }
+
         information += fields + "\n";
         otherMethods += joinLines(classInfo.getterSetterBrief) + "\n";
         otherFullMethods += getBodies(config, classInfo, classInfo.getterSetterSigs) + "\n";
         
         otherMethods += joinLines(otherBriefMethods) + "\n";
         otherFullMethods += joinLines(otherMethodBodies) + "\n";
-    
-        // Incorporar métodos vecinos desde RAG
-        otherFullMethods += joinLines(ragMethods) + "\n";
         information += methodInfo.sourceCode + "\n}";
+
+        // Agregar RAG: Buscar métodos vecinos relevantes
+        List<Map<String, String>> neighbors = embeddingClient.searchCode(
+                methodInfo.className,
+                methodInfo.methodSignature,
+                methodInfo.sourceCode,
+                5 // Ajustamos a 8 vecinos
+        );
+    
+        List<String> ragMethods = new ArrayList<>();
+        for (Map<String, String> neighbor : neighbors) {
+            String neighborCode = neighbor.get("code");
+            String neighborComment = neighbor.get("comment");
+            String neighborSignature = neighbor.get("signature");
+            ragMethods.add("// [RAG] " + neighborComment + "\n" + neighborSignature + "\n" + neighborCode);
+        }
     
         // Estructurar el contexto final
         promptInfo.setContext(
             "### Main Information ###\n" + information +
-            "\n\n### RAG Retrieved Neighbours ###\n" + otherFullMethods
+            "\n\n### RAG Retrieved Neighbours ###\n" + ragMethods
         );
         
         promptInfo.setOtherMethodBrief(otherMethods);
