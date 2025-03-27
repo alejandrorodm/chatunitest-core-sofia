@@ -64,6 +64,7 @@ public class ClassParser {
         this.sharedInteger = sharedInteger;
         this.classMapping = classMapping;
         this.ocm = ocm;
+        embeddingClient.startPythonServer();
     }
 
     public int extractClass(String classPath) throws FileNotFoundException {
