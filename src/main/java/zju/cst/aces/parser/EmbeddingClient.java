@@ -20,43 +20,57 @@ public class EmbeddingClient {
     public Process process = null;
 
     public EmbeddingClient() {
-        startPythonServer();
+        //startPythonServer();
     }
 
+    public boolean isServerRunning(){
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:5000").openConnection();
+            connection.setRequestMethod("GET");
+            connection.connect();
+            int responseCode = connection.getResponseCode();
+            if (responseCode == 200)  {
+                System.out.println("El servidor Flask ya está corriendo.");
+                return true;
+            }else{
+                return false;
+            }
+        } catch (IOException e) {
+            System.out.println("El servidor Flask no está corriendo");
+            return false;
+        }
+    }
+    
     public void startPythonServer() {
-        // try {
-        //     try {
-        //         HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:5000").openConnection();
-        //         connection.setRequestMethod("GET");
-        //         connection.connect();
-        //         int responseCode = connection.getResponseCode();
-        //         if (responseCode == 200)  {
-        //             System.out.println("El servidor Flask ya está corriendo.");
-        //             return;
-        //         }
-        //     } catch (IOException e) {
-        //         System.out.println("El servidor Flask no está corriendo, iniciando uno nuevo.");
-        //     }
+        if(isServerRunning()){
+            return;
+        }else{
+            System.out.println("Iniciando el servidor...");
+            String pythonScriptPath = "C:\\Users\\Alejandro\\Documents\\UMA\\Practicas\\RAG\\chatunitest-core-sofia\\src\\main\\java\\zju\\cst\\aces\\util\\embeddingrest.py";  
+            ProcessBuilder processBuilder = new ProcessBuilder("python", pythonScriptPath);
+            processBuilder.redirectErrorStream(true);
+            try {
+                this.process = processBuilder.start();
+                System.out.println("Servidor iniciado.");
+            } catch (IOException e) {
+                System.out.println("Error al iniciar el servidor: " + e.getMessage());
+                throw new RuntimeException("No se pudo iniciar el servidor Flask. Deteniendo la ejecución.", e);
+            }    
+            
+            // Esperar a que el servidor inicie
+            boolean started = false;
+            int attempts = 0;
+            while (!started && attempts < 10) {
+                try {
+                    Thread.sleep(2000);
+                    started = isServerRunning();
+                } catch (InterruptedException e) {
+                    System.out.println("Error al esperar a que el servidor inicie: " + e.getMessage());
+                }
+                attempts++;
+            }
 
-        //     String pythonScriptPath = "C:\\Users\\Alejandro\\Documents\\UMA\\Curso24-25\\PracticasCurriculares\\ProyectoRAGJava\\chatunitest-core-sofia\\src\\main\\java\\zju\\cst\\aces\\util\\embeddingrest.py";  
-        //     ProcessBuilder processBuilder = new ProcessBuilder("python", pythonScriptPath);
-        //     processBuilder.redirectErrorStream(true);
-        //     this.process = processBuilder.start();
-
-        //     BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-        //     String line;
-        //     while ((line = reader.readLine()) != null) {
-        //         System.out.println(line);
-        //         if (line.contains("Running on")) {
-        //             System.out.println("Servidor Flask iniciado correctamente.");
-        //             break;
-        //         }
-        //     }
-
-        // } catch (IOException e) {
-        //     System.out.println("Error al iniciar el servidor Flask: " + e.getMessage());
-        // }
-        System.out.println("El servidor Flask ya está corriendo.");
+        }            
     }
 
     private String sendPostRequest(String endpoint, String inputJson) {
