@@ -81,7 +81,125 @@ def save_code():
     except Exception as e:
         print(f"Error interno: {e}")
         return jsonify({'error': str(e)}), 500
-    
+
+def cosine_similarity(vec1, vec2):
+    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+
+# Buscar métodos similares
+@app.route('/search_similar_methods', methods=['POST'])
+def search_similar_methods():
+    try:
+        data = request.json
+        class_name = data.get('class_name')
+        method_name = data.get('method_name')
+        code = data.get('code')
+        max_neighbours = data.get('max_neighbours', 5)
+        similarity_threshold = 0.7
+
+        if not code:
+            return jsonify({'error': 'Missing code'}), 400
+
+        query_embedding = generate_embedding(code)
+
+        # Búsqueda en la base de datos
+        try:
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=max_neighbours * 2,  # Extra para filtrar mejor luego
+                include=["metadatas", "embeddings"]
+            )
+        except Exception as e:
+            return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
+
+        matched_results = []
+        for meta, neighbor_embedding in zip(results["metadatas"][0], results["embeddings"][0]):
+            similarity = cosine_similarity(query_embedding, neighbor_embedding)
+
+            if similarity < similarity_threshold or similarity >= 1:
+                continue  # Evita valores irrelevantes
+
+            if meta.get("class_name") == class_name and meta.get("method_name") == method_name:
+                continue  # Evita devolver el mismo método que se está buscando
+
+            matched_results.append({
+                "class_name": meta.get("class_name"),
+                "method_name": meta.get("method_name"),
+                "signature": meta.get("signature"),
+                "code": meta.get("code"),
+                "comment": meta.get("comment"),
+                "annotations": meta.get("annotations"),
+                "similarity": round(similarity, 2)
+            })
+
+            if len(matched_results) >= max_neighbours:
+                break
+
+        if not matched_results:
+            return jsonify({'error': 'No similar methods found'}), 404
+
+        return jsonify({'results': matched_results})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Buscar clases similares
+@app.route('/search_similar_classes', methods=['POST'])
+def search_similar_classes():
+    try:
+        data = request.json
+        class_name = data.get('class_name')
+        max_neighbours = data.get('max_neighbours', 5)
+        similarity_threshold = 0.7
+
+        if not class_name:
+            return jsonify({'error': 'Missing class name'}), 400
+
+        # Buscar la clase en la base de datos
+        try:
+            results = collection.get(
+                where={"class_name": {"$eq": class_name}},
+                include=["metadatas", "embeddings"]
+            )
+            query_embedding = results["embeddings"][0]
+        except Exception as e:
+            return jsonify({'error': 'Class not found', 'details': str(e)}), 404
+
+        # Búsqueda de clases similares en la base de datos
+        try:
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=max_neighbours * 2,  # Extra para filtrado
+                include=["metadatas", "embeddings"]
+            )
+        except Exception as e:
+            return jsonify({'error': 'Error retrieving similar classes', 'details': str(e)}), 500
+
+        matched_results = []
+        for meta, neighbor_embedding in zip(results["metadatas"][0], results["embeddings"][0]):
+            similarity = cosine_similarity(query_embedding, neighbor_embedding)
+
+            if similarity < similarity_threshold or similarity >= 1:
+                continue  # Evita valores irrelevantes
+
+            if meta.get("class_name") == class_name:
+                continue  # Evita devolver la misma clase
+
+            matched_results.append({
+                "class_name": meta.get("class_name"),
+                "similarity": round(similarity, 2)
+            })
+
+            if len(matched_results) >= max_neighbours:
+                break
+
+        if not matched_results:
+            return jsonify({'error': 'No similar classes found'}), 404
+
+        return jsonify({'results': matched_results})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Buscar código por similitud
 @app.route('/search_code', methods=['POST'])
