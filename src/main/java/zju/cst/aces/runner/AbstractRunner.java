@@ -138,7 +138,8 @@ public abstract class AbstractRunner {
                 false,
                 classInfo.fullClassName,
                 methodInfo.methodName,
-                methodInfo.methodSignature);
+                methodInfo.methodSignature,
+                methodInfo.methodDescriptor);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
         String fields = joinLines(classInfo.fields);
@@ -178,7 +179,8 @@ public abstract class AbstractRunner {
                 true,
                 classInfo.fullClassName,
                 methodInfo.methodName,
-                methodInfo.methodSignature);
+                methodInfo.methodSignature,
+                methodInfo.methodDescriptor);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
         List<String> otherBriefMethods = new ArrayList<>();
@@ -509,7 +511,7 @@ public abstract class AbstractRunner {
     public static boolean runTest(Config config, String fullTestName, PromptInfo promptInfo, int rounds) {
         String testName = fullTestName.substring(fullTestName.lastIndexOf(".") + 1);
         Path savePath;
-        if(config.phaseType.equals("HITS") || config.phaseType.equals("SOFIA_HITS")) {
+        if(config.phaseType.equals("HITS") || config.phaseType.equals("SOFIA_HITS") || config.phaseType.equals("SOFIA_HITS_RAG")) {
             savePath = config.getTestOutput().resolve(fullTestName.replace(".", File.separator) + "_slice" + promptInfo.getSliceNum() + ".java"); // todo 这里要加上切片序号
         } else {
             savePath = config.getTestOutput().resolve(fullTestName.replace(".", File.separator) + ".java"); // todo 这里要加上切片序号

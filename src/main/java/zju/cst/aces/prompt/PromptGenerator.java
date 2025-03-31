@@ -15,10 +15,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static zju.cst.aces.api.phase.solution.SYMPROMPT.convertedPaths;
-
+import zju.cst.aces.parser.EmbeddingClient;
+ 
 public class PromptGenerator {
     public Config config;
     public PromptTemplate promptTemplate;
+    private static EmbeddingClient embeddingClient = new EmbeddingClient();
 
     public PromptGenerator(Config config) {
         this.config = config;
@@ -85,6 +87,12 @@ public class PromptGenerator {
             chatMessages.add(ChatMessage.ofSystem(createSystemPrompt(promptInfo, selectPromptFile(templateName, false).getGenerateSystem())));
             chatMessages.add(ChatMessage.of(createUserPrompt(promptInfo, selectPromptFile(templateName, false).getGenerate())));
         } else {
+            // if (promptInfo.getErrorMsg().getErrorType() == TestMessage.ErrorType.COMPILE_ERROR) {
+            //     promptInfo.context += "RAG Neighbourhood Search: \n";
+            //     for (String errorMessage : promptInfo.errorMsg.getErrorMessage()) {
+            //         promptInfo.context += embeddingClient.searchCode("NULL", "NULL", errorMessage, 1);
+            //     }
+            // }
             processRepair(promptInfo);
             chatMessages.add(ChatMessage.ofSystem(createSystemPrompt(promptInfo, selectPromptFile(templateName, true).getGenerateSystem())));
             chatMessages.add(ChatMessage.of(createUserPrompt(promptInfo, selectPromptFile(templateName, true).getGenerate())));
@@ -150,6 +158,8 @@ public class PromptGenerator {
             case "SOFIA":
                 return PromptFile.sofia_init;
             case "SOFIA_HITS":
+                return config.useSlice ? PromptFile.sofia_hits_slice_init : PromptFile.sofia_hits_test_init;
+            case "SOFIA_HITS_RAG":
                 return config.useSlice ? PromptFile.sofia_hits_slice_init : PromptFile.sofia_hits_test_init;
             default:
                 return PromptFile.chatunitest_init;

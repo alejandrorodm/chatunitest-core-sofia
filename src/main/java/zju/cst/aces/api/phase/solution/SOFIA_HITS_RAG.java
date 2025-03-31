@@ -17,8 +17,8 @@ import java.nio.file.Path;
 import java.util.List;
 
 
-public class SOFIA_HITS extends PhaseImpl {
-    public SOFIA_HITS(Config config) {
+public class SOFIA_HITS_RAG extends PhaseImpl {
+    public SOFIA_HITS_RAG(Config config) {
         super(config);
     }
 
@@ -58,7 +58,7 @@ public class SOFIA_HITS extends PhaseImpl {
                 PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
                 obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
                 if(config.useSlice) {
-                    prompt = promptGenerator.generateMessages(obfuscatedPromptInfo, "SOFIA_HITS"); // todo
+                    prompt = promptGenerator.generateMessages(obfuscatedPromptInfo, "HITS"); // todo
                     generateMethodSlice(prompt, record, obfuscatedPromptInfo);
                     config.useSlice = false;
                 }else{
@@ -66,7 +66,7 @@ public class SOFIA_HITS extends PhaseImpl {
                 }
             } else {
                 if(config.useSlice) {
-                    prompt = promptGenerator.generateMessages(promptInfo, "SOFIA_HITS");
+                    prompt = promptGenerator.generateMessages(promptInfo, "HITS");
                     generateMethodSlice(prompt, record, promptInfo);
                     config.useSlice = false;
                 }else {

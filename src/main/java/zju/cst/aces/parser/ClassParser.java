@@ -167,6 +167,7 @@ public class ClassParser {
         );
 
         ci.setImplementedTypes(getInterfaces(classNode));
+        System.out.println("\n\nPARA LA CLASE" + ci.toString() + "\n");
         return ci;
     }
 
@@ -184,7 +185,8 @@ public class ClassParser {
                 getDependentMethods(cu, node),
                 node.toString(),
                 getMethodComment(node),
-                getMethodAnnotation(node)
+                getMethodAnnotation(node),
+                getMethodDescriptor(node)
         );
         mi.setUseField(useField(node));
         mi.setConstructor(node.isConstructorDeclaration());
@@ -192,6 +194,8 @@ public class ClassParser {
         mi.setPublic(isPublic(node));
         mi.setBoolean(isBoolean(node));
         mi.setAbstract(node.isAbstract());
+
+        System.out.println(mi.toString());
 
         embeddingClient.saveCode(
             mi.className, 
@@ -472,6 +476,11 @@ public class ClassParser {
             return comment.getContent();
         }
         return "";
+    }
+
+    private String getMethodDescriptor(CallableDeclaration<?> node) {
+        StringBuilder descriptor = new StringBuilder("");
+        return descriptor.toString();
     }
 
     /**

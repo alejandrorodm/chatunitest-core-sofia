@@ -20,6 +20,8 @@ public class PromptInfo {
     public String otherMethodBodies;
     public Map<String, String> constructorDeps = new HashMap<>(); // dependent classes in constructor.
     public Map<String, String> methodDeps = new HashMap<>(); // dependent classes in method parameters and body.
+    public Map<String, String> externalConstructorDeps = new HashMap<>(); // dependent classes in constructor.
+    public Map<String, String> externalMethodDeps = new HashMap<>(); // dependent classes in constructor.
     public TestMessage errorMsg;
     public String unitTest = "";
     public String fullTestName;
@@ -36,16 +38,19 @@ public class PromptInfo {
     public float coverage=0;//max_coverage
     public int coverage_improve_time=0;
     public String max_coverage_test_code;
+    public Integer sofiaActivations=0;
+    public String methodDescriptor;
 
 
     public PromptInfo(boolean hasDep, String fullClassName, String methodName,
-                      String methodSignature) {
+                      String methodSignature, String methodDescriptor) {
         this.hasDep = hasDep;
         this.fullClassName = fullClassName;
         this.className = fullClassName.contains(".") ?
                 fullClassName.substring(fullClassName.lastIndexOf(".") + 1) : fullClassName;
         this.methodName = methodName;
         this.methodSignature = methodSignature;
+        this.methodDescriptor = methodDescriptor;
     }
 
     public PromptInfo(){}
@@ -84,6 +89,20 @@ public class PromptInfo {
         this.constructorDeps.put(depClassName, constructorDep);
     }
 
+    public void addExternalMethodDeps(String depClassName, String methodDep) {
+        if (methodDep == null) {
+            return;
+        }
+        this.externalMethodDeps.put(depClassName, methodDep);
+    }
+
+    public void addExternalConstructorDeps(String depClassName, String constructorDep) {
+        if (constructorDep == null) {
+            return;
+        }
+        this.externalConstructorDeps.put(depClassName, constructorDep);
+    }
+
     public void addCorrectTest(MethodDeclaration m) {
         ClassOrInterfaceDeclaration c = (ClassOrInterfaceDeclaration) m.getParentNode()
                 .orElseThrow(() -> new NoSuchElementException("Parent node not found"));
@@ -102,35 +121,35 @@ public class PromptInfo {
         this.records.add(r);
     }
 
-    @Override
-    public String toString() {
-        return "PromptInfo{" +
-                "hasDep=" + hasDep +
-                ", fullClassName='" + fullClassName + '\'' +
-                ", className='" + className + '\'' +
-                ", methodName='" + methodName + '\'' +
-                ", methodSignature='" + methodSignature + '\'' +
-                ", context='" + context + '\'' +
-                ", otherMethodBrief='" + otherMethodBrief + '\'' +
-                ", otherMethodBodies='" + otherMethodBodies + '\'' +
-                ", constructorDeps=" + constructorDeps +
-                ", methodDeps=" + methodDeps +
-                ", errorMsg=" + errorMsg +
-                ", unitTest='" + unitTest + '\'' +
-                ", fullTestName='" + fullTestName + '\'' +
-                ", testPath=" + testPath +
-                ", correctTests=" + correctTests +
-                ", testNum=" + testNum +
-                ", round=" + round +
-                ", records=" + records +
-                ", methodInfo=" + methodInfo +
-                ", classInfo=" + classInfo +
-                ", methodSlicePath=" + methodSlicePath +
-                ", sliceNum=" + sliceNum +
-                ", sliceStep=" + sliceStep +
-                ", coverage=" + coverage +
-                ", coverage_improve_time=" + coverage_improve_time +
-                ", max_coverage_test_code='" + max_coverage_test_code + '\'' +
-                '}';
+    public String getMethodAndConstructorDepsStrings() {
+        return String.join(" ", methodDeps.values()) + String.join(" ", constructorDeps.values());
+    }
+
+    public Integer getTokenCount() {
+        Integer tokenSum = 0;
+        for (RoundRecord r : records) {
+            tokenSum += r.getPromptToken() + r.getResponseToken();
+        }
+        return tokenSum;
+    }
+
+    public Integer getInputTokenCount() {
+        Integer tokenSum = 0;
+        for (RoundRecord r : records) {
+            tokenSum += r.getPromptToken();
+        }
+        return tokenSum;
+    }
+
+    public Integer getOutputTokenCount() {
+        Integer tokenSum = 0;
+        for (RoundRecord r : records) {
+            tokenSum += r.getResponseToken();
+        }
+        return tokenSum;
+    }
+
+    public void incrementSofiaActivations() {
+        sofiaActivations++;
     }
 }

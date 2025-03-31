@@ -9,6 +9,7 @@ import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.PromptInfo;
 import zju.cst.aces.prompt.PromptGenerator;
 import zju.cst.aces.runner.AbstractRunner;
+import zju.cst.aces.runner.solution_runner.SofiaHitsRAGRunner;
 import zju.cst.aces.runner.solution_runner.SofiaHitsRunner;
 import zju.cst.aces.runner.solution_runner.SofiaRunner;
 import zju.cst.aces.util.TokenCounter;
@@ -53,6 +54,9 @@ public class PromptConstructorImpl implements PromptConstructor {
         } else if (config.getPhaseType().equals("SOFIA_HITS")) {
             SofiaHitsRunner.setStaticParams(config);
             this.promptInfo = SofiaHitsRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
+        } else if (config.getPhaseType().equals("SOFIA_HITS_RAG")){
+            SofiaHitsRAGRunner.setStaticParams(config);
+            this.promptInfo = SofiaHitsRAGRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
         } else {
             this.promptInfo = AbstractRunner.generatePromptInfoWithDep(config, classInfo, methodInfo);
         }

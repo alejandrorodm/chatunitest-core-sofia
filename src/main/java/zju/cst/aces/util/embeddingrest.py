@@ -15,7 +15,6 @@ app = Flask(__name__)
 # Chroma with persistency
 chroma_client = chromadb.PersistentClient()
 
-
 collection = chroma_client.get_or_create_collection(name="codebase")
 
 # Cargar el modelo
@@ -36,7 +35,6 @@ def generate_embedding(text):
 def index():
     return 'Hello World!'
 
-# Ruta para guardar código
 @app.route('/save_code', methods=['POST'])
 def save_code():
     try:
@@ -56,12 +54,12 @@ def save_code():
         if embeddings is None:
             return jsonify({'error': 'Error generating embeddings'}), 500
 
-        id = class_name + signature
-        
-        # Guardar en la base de datos vectorial
+        method_id = f"{class_name}-{signature}"  # ID único por método
+
+        # Guardar en la base de datos vectorial por método
         try:
             collection.add(
-                ids=[id],
+                ids=[method_id],
                 embeddings=[embeddings],
                 metadatas=[{
                     "class_name": class_name,
@@ -73,14 +71,49 @@ def save_code():
                 }]
             )
         except Exception as e:
-            print(f"Error en el guardado en la base de datos: {e}")
-            return jsonify({'Error en el guardado en la base de datos': str(e)}), 500
-        else:
-            print(f"Código {method_name} con {signature} guardado correctamente")
-            return jsonify({'message': 'Code saved successfully'})
+            print(f"Error guardando método en la base de datos: {e}")
+            return jsonify({'error': str(e)}), 500
+
+        # 💡 Nuevo: Actualizar el embedding de la clase
+        update_class_embedding(class_name)
+
+        return jsonify({'message': f'Method {method_name} saved successfully'})
+
     except Exception as e:
         print(f"Error interno: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+def update_class_embedding(class_name):
+    """Genera un nuevo embedding para la clase combinando los métodos guardados."""
+    try:
+        # Obtener todos los métodos de la clase
+        results = collection.get(
+            where={"class_name": {"$eq": class_name}},
+            include=["embeddings"]
+        )
+
+        if not results["embeddings"]:
+            print(f"No hay métodos en la clase {class_name}, no se genera embedding de clase.")
+            return
+
+        # Hacer la media de los embeddings de los métodos para representar la clase
+        class_embedding = np.mean(results["embeddings"], axis=0).tolist()
+
+        # Guardar o actualizar el embedding de la clase
+        class_id = f"class-{class_name}"
+
+        collection.add(
+            ids=[class_id],
+            embeddings=[class_embedding],
+            metadatas=[{"class_name": class_name}]
+        )
+
+        print(f"Embedding de la clase {class_name} actualizado correctamente.")
+
+    except Exception as e:
+        print(f"Error actualizando embedding de clase: {e}")
+
 
 def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
