@@ -6,10 +6,6 @@ from waitress import serve
 import os
 import numpy as np
 
-# Crear el directorio si no existe
-if not os.path.exists("./chroma_data"):
-    os.makedirs("./chroma_data")
-
 app = Flask(__name__)
 
 # Chroma with persistency

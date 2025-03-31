@@ -125,6 +125,8 @@ public class SofiaHitsRunner extends MethodRunner {
     }
 
     public static PromptInfo generatePromptInfoWithDep(Config config, ClassInfo classInfo, MethodInfo methodInfo) throws IOException {
+
+        //Inicializar prompt
         PromptInfo promptInfo = new PromptInfo(
                 true,
                 classInfo.fullClassName,
@@ -136,18 +138,22 @@ public class SofiaHitsRunner extends MethodRunner {
         List<String> otherMethodBodies = new ArrayList<>();
     
         // Procesar dependencias de constructores
+        // Contiene métodos llamados en los constructores de la clase
         for (Map.Entry<String, Set<String>> entry : classInfo.constructorDeps.entrySet()) {
             String depClassName = entry.getKey();
             Set<String> depMethods = entry.getValue();
             if (methodInfo.dependentMethods.containsKey(depClassName)) {
                 continue;
             }
+            //Obtener codigo fuente dependencias
             promptInfo.addConstructorDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
         }
     
         // Procesar métodos dependientes
         for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
             String depClassName = entry.getKey();
+
+            //Si la dependencia es de la misma clase
             if (depClassName.equals(classInfo.getClassName())) {
                 Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
                 for (String otherMethod : otherSig) {
@@ -155,12 +161,15 @@ public class SofiaHitsRunner extends MethodRunner {
                     if (otherMethodInfo == null){ 
                         continue;
                     }
+                    // Solo añade métodos de la clase focal que se invocan
                     otherBriefMethods.add(otherMethodInfo.brief);
                     otherMethodBodies.add(otherMethodInfo.sourceCode);
                 }
                 continue;
             }
             Set<String> depMethods = entry.getValue();
+
+            //Dependencias externas (Maven)
             promptInfo.addMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, depMethods));
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
         }
@@ -194,7 +203,7 @@ public class SofiaHitsRunner extends MethodRunner {
                 methodInfo.className,
                 methodInfo.methodSignature,
                 methodInfo.sourceCode,
-                5 // Ajustamos a 8 vecinos
+                3 // Ajustamos a 8 vecinos
         );
     
         List<String> ragMethods = new ArrayList<>();
@@ -216,28 +225,6 @@ public class SofiaHitsRunner extends MethodRunner {
     
         return promptInfo;
     }
-    
-    // Nueva función para enriquecer validación con contexto RAG
-    // public boolean validateWithRAG(PromptConstructorImpl pc) {
-    //     PromptInfo promptInfo = pc.getPromptInfo();
-    //     logger.info("Validando con contexto extendido RAG");
-    
-    //     List<Map<String, String>> neighbors = embeddingClient.searchCode(
-    //             promptInfo.getClassInfo().fullClassName,
-    //             promptInfo.getMethodInfo().methodSignature,
-    //             promptInfo.getMethodInfo().sourceCode,
-    //             4);
-    
-    //     for (Map<String, String> neighbor : neighbors) {
-    //         String neighborCode = neighbor.get("code");
-    //         logger.info("Validando contra código vecino:\n" + neighborCode);
-    //         if (neighborCode.contains("@Test") && neighborCode.contains("assert")) {
-    //             logger.info("Test vecino identificado, ajustando validación.");
-    //             return true;
-    //         }
-    //     }
-    //     return false;
-    // }
 
     public static String getDepInfo(Config config, String depClassName, Set<String> depMethods) throws IOException {
         ClassInfo depClassInfo = getClassInfo(config, depClassName);
@@ -254,6 +241,7 @@ public class SofiaHitsRunner extends MethodRunner {
 
         String basicInfo = depClassInfo.packageName + "\n" + joinLines(depClassInfo.imports) + "\n"
                 + classSig + " {\n" + fields + "\n";
+        
         if (depClassInfo.hasConstructor) {
             String constructors = "";
             for (String sig : depClassInfo.constructorSigs) {
