@@ -179,7 +179,6 @@ public class SofiaHitsRunner extends MethodRunner {
             //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
         }
 
-
         //COMPROBAR FUNCIONAMIENTO
         List <MethodInfo> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 3);
         for(MethodInfo meth : rag_results) {
