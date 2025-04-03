@@ -40,3 +40,9 @@ build/
 ### Mac OS ###
 .DS_Store*
 !.gitignore
+
+# Ignorar la carpeta chroma
+chroma/
+
+# Ignorar todos los archivos con extensión .sqlite3
+*.sqlite3
