@@ -4,10 +4,7 @@ import zju.cst.aces.api.phase.Phase;
 import zju.cst.aces.api.phase.PhaseImpl;
 import zju.cst.aces.api.config.Config;
 import zju.cst.aces.api.impl.PromptConstructorImpl;
-import zju.cst.aces.api.impl.obfuscator.Obfuscator;
 import zju.cst.aces.dto.*;
-import zju.cst.aces.runner.ClassRunner;
-import zju.cst.aces.util.JsonResponseProcessor;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -68,12 +65,19 @@ public class MethodRunner extends ClassRunner {
         PromptInfo promptInfo = pc.getPromptInfo();
         promptInfo.setRound(0);
 
+        long startTime = System.nanoTime();
         // Test Generation Phase
         phase.generateTest(pc);
+
 
         // Validation
         if (phase.validateTest(pc)) {
             exportRecord(pc.getPromptInfo(), classInfo, num);
+            if (config.generateJsonReport) {
+                long endTime = System.nanoTime();
+                float duration = (float)(endTime - startTime)/ 1_000_000_000;
+                generateJsonReport(pc.getPromptInfo(), duration, true);
+            }
 
             return true;
         }
@@ -86,15 +90,26 @@ public class MethodRunner extends ClassRunner {
             // Repair
             phase.repairTest(pc);
 
+
             // Validation and process
             if (phase.validateTest(pc)) { // if passed validation
                 exportRecord(pc.getPromptInfo(), classInfo, num);
+                if (config.generateJsonReport) {
+                    long endTime = System.nanoTime();
+                    float duration = (float) (endTime - startTime) / 1_000_000_000;
+                    generateJsonReport(pc.getPromptInfo(), duration, true);
+                }
                 return true;
             }
 
         }
 
         exportRecord(pc.getPromptInfo(), classInfo, num);
+        if (config.generateJsonReport) {
+            long endTime = System.nanoTime();
+            float duration = (float) (endTime - startTime) / 1_000_000_000;
+            generateJsonReport(pc.getPromptInfo(), duration, false);
+        }
         return false;
     }
 }

@@ -4,8 +4,7 @@ import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
 import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import zju.cst.aces.api.Task;
 import zju.cst.aces.api.config.Config;
@@ -138,7 +137,8 @@ public abstract class AbstractRunner {
                 false,
                 classInfo.fullClassName,
                 methodInfo.methodName,
-                methodInfo.methodSignature);
+                methodInfo.methodSignature,
+                methodInfo.methodDescriptor);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
         String fields = joinLines(classInfo.fields);
@@ -178,7 +178,8 @@ public abstract class AbstractRunner {
                 true,
                 classInfo.fullClassName,
                 methodInfo.methodName,
-                methodInfo.methodSignature);
+                methodInfo.methodSignature,
+                methodInfo.methodDescriptor);
         promptInfo.setClassInfo(classInfo);
         promptInfo.setMethodInfo(methodInfo);
         List<String> otherBriefMethods = new ArrayList<>();
@@ -446,6 +447,110 @@ public abstract class AbstractRunner {
             writer.write(GSON.toJson(methodMapping));
         } catch (IOException e) {
             throw new RuntimeException("In AbstractRunner.exportMethodMapping: " + e);
+        }
+    }
+
+    public void generateJsonReport(PromptInfo promptInfo, float duration, boolean success) {
+        Path outputPath = config.getTestOutput();
+        File outputInfo = outputPath.resolve("generationData.json").toFile();
+
+        Map<String, Map<String, String>> attemptMapping = new TreeMap<>();
+        String fullNamePrefix = promptInfo.getFullTestName().substring(0, promptInfo.getFullTestName().indexOf("_Test") - 1);
+        for (int i = 0; i < config.getTestNumber(); i++) {
+            Map<String, String> map = new LinkedHashMap<>();
+            String fullTestName = fullNamePrefix + i + "_Test";
+            map.put("testClassName", fullTestName.substring(fullTestName.lastIndexOf(".") + 1));
+            map.put("fullName", fullTestName);
+            map.put("path", promptInfo.getTestPath().toString());
+            map.put("className", promptInfo.className);
+            map.put("packageName", promptInfo.classInfo.packageName);
+            map.put("methodName", promptInfo.methodName);
+            map.put("methodSig", promptInfo.methodSignature);
+            map.put("methodDesc", promptInfo.methodDescriptor);
+            map.put("time", String.valueOf(duration));
+            map.put("success", String.valueOf(success));
+            map.put("round", String.valueOf(promptInfo.round));
+            map.put("inputTokenConsumption", String.valueOf(promptInfo.getInputTokenCount()));
+            map.put("outputTokenConsumption", String.valueOf(promptInfo.getOutputTokenCount()));
+            if (config.getPhaseType().equals("SOFIA"))
+                map.put("sofiaActivations", String.valueOf(promptInfo.getSofiaActivations()));
+            attemptMapping.put("attempt" + i, map);
+        }
+        try {
+
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            JsonElement newElement = gson.toJsonTree(attemptMapping);
+
+            JsonArray jsonArray;
+            if (outputInfo.exists() && Files.size(outputInfo.toPath()) > 0) {
+                try (Reader reader = Files.newBufferedReader(outputInfo.toPath())) {
+                    jsonArray = JsonParser.parseReader(reader).getAsJsonArray();
+                }
+            } else {
+                jsonArray = new JsonArray(); // If file does not exist, create an empty array
+            }
+            // Append the new data
+            jsonArray.add(newElement);
+
+            try (Writer infoWriter = new FileWriter(outputInfo, false)) { // Overwrite mode
+                gson.toJson(jsonArray, infoWriter);
+                infoWriter.flush(); // Ensure all data is written
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("In AbstractRunner.generateJsonReport: " + e);
+        }
+    }
+
+    public void generateJsonReportHITS(PromptInfo promptInfo, float duration, int nSlices, int successfulSlices) {
+        Path outputPath = config.getTestOutput();
+        File outputInfo = outputPath.resolve("generationData.json").toFile();
+
+        Map<String, Map<String, String>> attemptMapping = new TreeMap<>();
+        String fullNamePrefix = promptInfo.getFullTestName().substring(0, promptInfo.getFullTestName().indexOf("_Test") - 1);
+        for (int i = 0; i < config.getTestNumber(); i++) {
+            Map<String, String> map = new LinkedHashMap<>();
+            String fullTestName = fullNamePrefix + i + "_Test";
+            map.put("testClassName", fullTestName.substring(fullTestName.lastIndexOf(".") + 1));
+            map.put("fullName", fullTestName);
+            map.put("path", promptInfo.getTestPath().toString());
+            map.put("className", promptInfo.className);
+            map.put("packageName", promptInfo.classInfo.packageName);
+            map.put("methodName", promptInfo.methodName);
+            map.put("methodSig", promptInfo.methodSignature);
+            map.put("methodDesc", promptInfo.methodDescriptor);
+            map.put("time", String.valueOf(duration));
+            map.put("totalSlices", String.valueOf(nSlices));
+            map.put("successfulSlices", String.valueOf(successfulSlices));
+            map.put("inputTokenConsumption", String.valueOf(promptInfo.getInputTokenCount()));
+            map.put("outputTokenConsumption", String.valueOf(promptInfo.getOutputTokenCount()));
+            if (config.getPhaseType().equals("SOFIA_HITS"))
+                map.put("sofiaActivations", String.valueOf(promptInfo.getSofiaActivations()));
+            attemptMapping.put("attempt" + i, map);
+        }
+        try {
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            JsonElement newElement = gson.toJsonTree(attemptMapping);
+
+            JsonArray jsonArray;
+            if (outputInfo.exists() && Files.size(outputInfo.toPath()) > 0) {
+                try (Reader reader = Files.newBufferedReader(outputInfo.toPath())) {
+                    jsonArray = JsonParser.parseReader(reader).getAsJsonArray();
+                }
+            } else {
+                jsonArray = new JsonArray(); // If file does not exist, create an empty array
+            }
+
+            // Append the new data
+            jsonArray.add(newElement);
+
+            try (Writer infoWriter = new FileWriter(outputInfo, false)) { // Overwrite mode
+                gson.toJson(jsonArray, infoWriter);
+                infoWriter.flush(); // Ensure all data is written
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("In AbstractRunner.generateJsonReport: " + e);
         }
     }
 

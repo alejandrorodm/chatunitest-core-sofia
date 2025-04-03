@@ -8,7 +8,7 @@ public class processNameForHITS {
 
     public static void main(String[] args) {
         // 文件夹路径
-        String folderPath = "C:/Users/Alejandro/Documents/UMA/Practicas/RAG/01-OV3/gestion-expedientes-master/chatunitest-tests/es/juntadeandalucia/ceceu/sede/gesexpedientes/service/impl";
+        String folderPath = "C:/RAG/01-OV3/gestion-expedientes-master/chatunitest-tests/es/juntadeandalucia/ceceu/sede/gesexpedientes/service/impl";
         System.out.println("Processing files in folder: " + folderPath);
         // 正则表达式匹配文件名
         Pattern filePattern = Pattern.compile("^(.*)_Test_slice(\\d+)\\.java$");

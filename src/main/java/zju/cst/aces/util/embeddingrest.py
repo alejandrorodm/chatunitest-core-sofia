@@ -3,96 +3,144 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 import chromadb
 from waitress import serve
-import os
 import numpy as np
+import json
+import re
 
 app = Flask(__name__)
 
 # Chroma with persistency
 chroma_client = chromadb.PersistentClient()
-
-
 collection = chroma_client.get_or_create_collection(name="codebase")
 
 # Cargar el modelo
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 model = AutoModel.from_pretrained("bert-base-uncased")
 
-
-# Función para generar embeddings
 def generate_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
-    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]  # Convierte ndarray a lista
-    print("Embeddings generados")
+    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
     return embeddings
 
+def cosine_similarity(vec1, vec2):
+    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
-@app.route('/')
-def index():
-    return 'Hello World!'
+@app.route('/', methods=['GET'])
+def home():
+    return "Hello!", 200
 
-# Ruta para guardar código
 @app.route('/save_code', methods=['POST'])
 def save_code():
     try:
         data = request.json
         class_name = data.get('class_name')
         method_name = data.get('method_name')
-        code = data.get('code')
         signature = data.get('signature')
-        comment = data.get('comment')
-        annotations = data.get('annotations')
-
-        if not class_name or not code:
-            return jsonify({'error': 'Missing class name or code'}), 400
-
-        embeddings = generate_embedding(code)
-
-        if embeddings is None:
-            return jsonify({'error': 'Error generating embeddings'}), 500
-
-        id = class_name + signature
+        code = data.get('code')
+        print(f'Code to be saved: Class: {class_name}, Method: {method_name}, Signature: {signature}')
         
-        # Guardar en la base de datos vectorial
-        try:
+        comment = data.get('comment', '')
+        annotations = data.get('annotations', '')
+        dependent_methods = data.get('dependent_methods', [])
+        
+        if not class_name or not  method_name or not code:
+            return jsonify({'error': 'Missing class name or code'}), 400
+        
+        # To avoid errores on expected metadata value
+        dependent_methods_str = json.dumps(dependent_methods)
+        
+        embeddings = generate_embedding(code)
+        collection.add(
+            ids=[class_name + '-' + signature],
+            embeddings=[embeddings],
+            metadatas=[{
+                "class_name": class_name,
+                "method_name": method_name,
+                "signature": signature,
+                "code": code,
+                "comment": comment,
+                "annotations": annotations,
+                "dependent_methods": dependent_methods_str
+            }]
+        )
+        return jsonify({'message': 'Code saved successfully'})
+    except Exception as e:
+        print(f"Error saving code: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/save_methods', methods=['POST'])
+def save_methods():
+    try:
+        data = request.json
+        class_name = data.get('class_name', '')
+        methods = data.get('methods', [])
+
+        if not class_name or not methods:
+            return jsonify({'error': 'Missing class name or methods'}), 400
+
+        for method in methods:
+            method_name = method.get('method_name')
+            signature = method.get('signature')
+            code = method.get('code')
+            comment = method.get('comment', '')
+            annotations = method.get('annotations', {})
+            dependent_methods = method.get('dependent_methods', [])
+
+            if not method_name or not code:
+                return jsonify({'error': 'Missing method name or code'}), 400
+
+            embeddings = generate_embedding(code)
             collection.add(
-                ids=[id],
+                ids=[class_name + '-' + method_name],
                 embeddings=[embeddings],
                 metadatas=[{
                     "class_name": class_name,
-                    "code": code,
                     "method_name": method_name,
                     "signature": signature,
+                    "code": code,
                     "comment": comment,
-                    "annotations": annotations
+                    "annotations": annotations,
+                    "dependent_methods": dependent_methods
                 }]
             )
-        except Exception as e:
-            print(f"Error en el guardado en la base de datos: {e}")
-            return jsonify({'Error en el guardado en la base de datos': str(e)}), 500
-        else:
-            print(f"Código {method_name} con {signature} guardado correctamente")
-            return jsonify({'message': 'Code saved successfully'})
+        return jsonify({'message': 'Methods saved successfully'})
     except Exception as e:
-        print(f"Error interno: {e}")
         return jsonify({'error': str(e)}), 500
 
-def cosine_similarity(vec1, vec2):
-    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-
-# Buscar métodos similares
+def extract_method_name(code):
+    # Regex to match method definitions in Java
+    match = re.search(r'public\s+[a-zA-Z0-9_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(', code)
+    if match:
+        return match.group(1)
+    return None
+        
 @app.route('/search_similar_methods', methods=['POST'])
 def search_similar_methods():
     try:
         data = request.json
-        class_name = data.get('class_name')
-        method_name = data.get('method_name')
+        print(f"Data received: {data}")
+        class_name = data.get('class_name', '')
+        method_name = data.get('method_name', '')
         code = data.get('code')
-        max_neighbours = data.get('max_neighbours', 5)
-        similarity_threshold = 0.7
+
+        # Extract method name from the provided code
+        method_name_from_code = extract_method_name(code)
+        
+        if class_name == '' or method_name == '':
+            print("Class name or method name is empty")
+            class_name = 'Dependency'
+            method_name = method_name_from_code
+            print("Code: ", code)
+        else:
+            print(f'Class: {class_name}, Method: {method_name}')
+        
+        max_neighbours = data.get('max_neighbours', 8)
+        similarity_threshold = 0.5
 
         if not code:
+            print("ERROR: Missing code")
             return jsonify({'error': 'Missing code'}), 400
 
         query_embedding = generate_embedding(code)
@@ -105,6 +153,7 @@ def search_similar_methods():
                 include=["metadatas", "embeddings"]
             )
         except Exception as e:
+            print(f"Error retrieving similar methods: {e}")
             return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
 
         matched_results = []
@@ -124,6 +173,7 @@ def search_similar_methods():
                 "code": meta.get("code"),
                 "comment": meta.get("comment"),
                 "annotations": meta.get("annotations"),
+                "dependent_methods": meta.get("dependent_methods", []),
                 "similarity": round(similarity, 2)
             })
 
@@ -131,160 +181,18 @@ def search_similar_methods():
                 break
 
         if not matched_results:
+            print("No similar methods found\n\n")
             return jsonify({'error': 'No similar methods found'}), 404
-
+        else:
+            print("Similar methods found:\n\n")
+            for result in matched_results:
+                print(result)
+            print("\n\n")
         return jsonify({'results': matched_results})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
-# Buscar clases similares
-@app.route('/search_similar_classes', methods=['POST'])
-def search_similar_classes():
-    try:
-        data = request.json
-        class_name = data.get('class_name')
-        max_neighbours = data.get('max_neighbours', 5)
-        similarity_threshold = 0.7
-
-        if not class_name:
-            return jsonify({'error': 'Missing class name'}), 400
-
-        # Buscar la clase en la base de datos
-        try:
-            results = collection.get(
-                where={"class_name": {"$eq": class_name}},
-                include=["metadatas", "embeddings"]
-            )
-            query_embedding = results["embeddings"][0]
-        except Exception as e:
-            return jsonify({'error': 'Class not found', 'details': str(e)}), 404
-
-        # Búsqueda de clases similares en la base de datos
-        try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=max_neighbours * 2,  # Extra para filtrado
-                include=["metadatas", "embeddings"]
-            )
-        except Exception as e:
-            return jsonify({'error': 'Error retrieving similar classes', 'details': str(e)}), 500
-
-        matched_results = []
-        for meta, neighbor_embedding in zip(results["metadatas"][0], results["embeddings"][0]):
-            similarity = cosine_similarity(query_embedding, neighbor_embedding)
-
-            if similarity < similarity_threshold or similarity >= 1:
-                continue  # Evita valores irrelevantes
-
-            if meta.get("class_name") == class_name:
-                continue  # Evita devolver la misma clase
-
-            matched_results.append({
-                "class_name": meta.get("class_name"),
-                "similarity": round(similarity, 2)
-            })
-
-            if len(matched_results) >= max_neighbours:
-                break
-
-        if not matched_results:
-            return jsonify({'error': 'No similar classes found'}), 404
-
-        return jsonify({'results': matched_results})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# Buscar código por similitud
-@app.route('/search_code', methods=['POST'])
-def search_code():
-    try:
-        data = request.json
-        class_name = data.get('class_name')
-        signature = data.get('signature')
-        max_neighbours = data.get('max_neighbours', 8)
-        similarity_threshold = 0.7
-
-        results = None
-        query_embedding = None
-
-        # Initial search by class name and method signature
-        if class_name and signature:
-            try:
-                results = collection.get(
-                    where={
-                        "$and": [
-                            {"class_name": {"$eq": class_name}},
-                            {"signature": {"$eq": signature}}
-                        ]
-                    },
-                    include=["metadatas", "embeddings"]
-                )
-                query_embedding = results["embeddings"]
-                query_embedding = query_embedding.tolist()[0]
-            except Exception as e:
-                print("Error en la búsqueda por nombre de clase y método: ", e)
-                query_embedding = None
-
-        # If not found, search by embedding the code
-        if query_embedding is None:
-            query_embedding = generate_embedding(data.get('code'))
-
-        # Search by near embeddings
-        try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=max_neighbours,
-                include=["metadatas", "embeddings"]
-            )
-        except Exception as e:
-            print("No se ha podido encontrar por código: ", e)
-            return jsonify({'error': 'No matching code found'}), 404
-
-        # Empaquetamos los resultados en objetos completos
-        matched_results = []
-        if results and results["metadatas"]:
-            neighbors = zip(results["metadatas"][0], results["embeddings"][0])
-            
-            # Calculamos la similitud del coseno
-            import numpy as np
-            def cosine_similarity(vec1, vec2):
-                return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-
-            for meta, neighbor_embedding in neighbors:
-                similarity = cosine_similarity(query_embedding, neighbor_embedding)
-                print(f"Similitud: {similarity:.2f}")
-                
-                if similarity < similarity_threshold or similarity >= 1:
-                    continue
-
-                matched_results.append({
-                    "class_name": meta.get("class_name"),
-                    "method_name": meta.get("method_name"),
-                    "signature": meta.get("signature"),
-                    "code": meta.get("code"),
-                    "comment": meta.get("comment"),
-                    "annotations": meta.get("annotations"),
-                    "similarity": round(similarity, 2)
-                })
-
-                if len(matched_results) >= max_neighbours:
-                    break
-
-        if not matched_results:
-            return jsonify({'error': 'No matching code found'}), 404
-
-        return jsonify({'results': matched_results})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-
 
 if __name__ == '__main__':
-    #app.run(debug=True, host='0.0.0.0', port=5000)
+    print("Server is starting on http://127.0.0.1:5000")
     serve(app=app, host='127.0.0.1', port=5000)
-    print("Running on")

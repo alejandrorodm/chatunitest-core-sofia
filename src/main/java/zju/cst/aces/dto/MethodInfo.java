@@ -24,9 +24,10 @@ public class MethodInfo {
     public String full_method_info;
     public String method_comment;
     public String method_annotation;
+    public String methodDescriptor;
 
     public MethodInfo(String className, String methodName, String brief, String methodSignature,
-                      String sourceCode, List<String> parameters, Map<String, Set<String>> dependentMethods,String full_method_info,String method_comment,String method_annotation ){
+                      String sourceCode, List<String> parameters, Map<String, Set<String>> dependentMethods,String full_method_info,String method_comment,String method_annotation, String methodDescriptor){
         this.className = className;
         this.methodName = methodName;
         this.brief = brief;
@@ -37,28 +38,8 @@ public class MethodInfo {
         this.full_method_info=full_method_info;
         this.method_comment=method_comment;
         this.method_annotation=method_annotation;
+        this.methodDescriptor=methodDescriptor;
     }
 
-    @Override
-    public String toString() {
-        return "MethodInfo{" +
-                "className='" + className + '\'' +
-                ", methodName='" + methodName + '\'' +
-                ", brief='" + brief + '\'' +
-                ", methodSignature='" + methodSignature + '\'' +
-                ", sourceCode='" + sourceCode + '\'' +
-                ", useField=" + useField +
-                ", isConstructor=" + isConstructor +
-                ", isGetSet=" + isGetSet +
-                ", isPublic=" + isPublic +
-                ", isBoolean=" + isBoolean +
-                ", isAbstract=" + isAbstract +
-                ", parameters=" + parameters +
-                ", dependentMethods=" + dependentMethods +
-                ", full_method_info='" + full_method_info + '\'' +
-                ", method_comment='" + method_comment + '\'' +
-                ", method_annotation='" + method_annotation + '\'' +
-                '}';
-    }
 
 }

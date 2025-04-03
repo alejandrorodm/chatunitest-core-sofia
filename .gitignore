@@ -38,5 +38,5 @@ build/
 .vscode/
 
 ### Mac OS ###
-.DS_Store
-/src/main/java/zju/cst/aces/util/chroma
+.DS_Store*
+!.gitignore
