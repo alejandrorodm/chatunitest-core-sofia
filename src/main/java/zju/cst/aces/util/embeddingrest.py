@@ -21,6 +21,7 @@ def generate_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
     embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
+    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
     return embeddings
 
 def cosine_similarity(vec1, vec2):
@@ -99,6 +100,7 @@ def save_methods():
                     "class_name": class_name,
                     "method_name": method_name,
                     "signature": signature,
+                    "code": code,
                     "code": code,
                     "comment": comment,
                     "annotations": annotations,
@@ -196,3 +198,4 @@ def search_similar_methods():
 if __name__ == '__main__':
     print("Server is starting on http://127.0.0.1:5000")
     serve(app=app, host='127.0.0.1', port=5000)
+

@@ -220,6 +220,23 @@ public class SofiaHitsRunner extends MethodRunner {
         return promptInfo;
     }
 
+    public static void storeDepMethods(Config config, String depClassName, Set<String> depMethods) throws IOException {
+        ClassInfo depClassInfo = getClassInfo(config, depClassName);
+        if (depClassInfo == null) return;
+
+        for (String sig : depMethods) {
+            MethodInfo depMethodInfo = getMethodInfo(config, depClassInfo, sig);
+            if (depMethodInfo == null) continue;
+
+            String methodCode = depMethodInfo.getSourceCode();
+            if (methodCode.isEmpty()) continue;
+
+            // Generar embedding y almacenar en Chroma
+            //ESTA LINEA TIENES QUE MODIFICARLA PARA GUARDAR LOS METODOS
+        }
+    }
+
+
     public static void addMethodDepsByDepth(Config config, String className, Set<String> methodSigs, PromptInfo promptInfo, int depth) throws IOException {
         if (depth <= 1) {
             return;
