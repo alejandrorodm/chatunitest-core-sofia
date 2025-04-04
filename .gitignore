@@ -46,3 +46,4 @@ chroma/
 
 # Ignorar todos los archivos con extensión .sqlite3
 *.sqlite3
+src/main/java/zju/cst/aces/util/chroma/chroma.sqlite3

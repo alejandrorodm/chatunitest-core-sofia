@@ -16,6 +16,7 @@ import zju.cst.aces.dto.PromptInfo;
 import zju.cst.aces.runner.MethodRunner;
 import zju.cst.aces.util.EmbeddingClient;
 import zju.cst.aces.util.JsonResponseProcessor;
+import zju.cst.aces.parser.CodeParser;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -171,6 +172,8 @@ public class SofiaHitsRunner extends MethodRunner {
             Set<String> depMethods = entry.getValue();
             System.out.println("DEPMETHODS " + depMethods.toString());
 
+            //los depmethods de la misma clase debo de darlos? Ver implementación inicial y comparar
+
             //Guardar en la base de datos vectorial
             saveDepInfo(config, depClassName, depMethods, promptInfo);
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
@@ -180,7 +183,7 @@ public class SofiaHitsRunner extends MethodRunner {
         }
 
         //COMPROBAR FUNCIONAMIENTO
-        List <MethodInfo> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 3);
+        List <MethodInfo> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 11);
         for(MethodInfo meth : rag_results) {
             promptInfo.addMethodDeps(meth.getClassName(), meth.getSourceCode());;
         }
@@ -229,9 +232,6 @@ public class SofiaHitsRunner extends MethodRunner {
 
             String methodCode = depMethodInfo.getSourceCode();
             if (methodCode.isEmpty()) continue;
-
-            // Generar embedding y almacenar en Chroma
-            //ESTA LINEA TIENES QUE MODIFICARLA PARA GUARDAR LOS METODOS
         }
     }
 
@@ -298,61 +298,6 @@ public class SofiaHitsRunner extends MethodRunner {
         }
     }
 
-    public static List<String> extractMethodsFromCode(String depClassName, String sourceCode) {
-        List<String> methods = new ArrayList<>();
-        String[] lines = sourceCode.split("\n");
-        StringBuilder methodBuilder = new StringBuilder();
-        boolean inMethod = false;
-        int braceCount = 0;
-    
-        for (String line : lines) {
-            line = line.trim();
-            if (line.isEmpty()) {
-                continue;
-            }
-    
-            if (!inMethod && (line.startsWith("public") || line.startsWith("private") || line.startsWith("protected") || line.startsWith("static"))) {
-                inMethod = true;
-            }
-    
-            if (inMethod) {
-                methodBuilder.append(line).append("\n");
-                if (line.contains("{")) {
-                    braceCount++;
-                }
-                if (line.contains("}")) {
-                    braceCount--;
-                }
-                if (braceCount == 0) {
-                    methods.add(methodBuilder.toString());
-                    methodBuilder.setLength(0);
-                    inMethod = false;
-                }
-            }
-        }
-    
-        return methods;
-    }
-    
-    private static String extractSignature(String methodHeader) {
-        int parenIndex = methodHeader.indexOf("(");
-        if (parenIndex == -1) {
-            return "unknown";
-        }
-        String[] parts = methodHeader.substring(0, parenIndex).split(" ");
-        return parts[parts.length - 1] + methodHeader.substring(parenIndex);
-    }
-
-    public static void saveExtractedMethods(String depClassName, String sourceCode) {
-        List<String> methods = extractMethodsFromCode(depClassName, sourceCode);
-        for (String methodCode : methods) {
-            String firstLine = methodCode.split("\n")[0].trim();
-            String signature = extractSignature(firstLine);
-            String methodName = signature;
-            embeddingClient.saveCode(depClassName, methodName, methodCode, methodName, "", "", null);
-        }
-    }
-
     public static String saveDepInfo(Config config, String depClassName, Set<String> depMethods, PromptInfo promptInfo) throws IOException {
 
         try{
@@ -363,13 +308,17 @@ public class SofiaHitsRunner extends MethodRunner {
                     String sourceCode = getSourceCode(depClassName);
                     if (sourceCode != null) {
                         promptInfo.incrementSofiaActivations();
-                        saveExtractedMethods(depClassName, sourceCode);
+                        CodeParser.saveExtractedMethods(depClassName, sourceCode);
                     }
                     return sourceCode;
                 } catch (Exception e) {
                     return null;
                 }
             } else {
+                // Guardar la clase en la base de datos vectorial (estas clases son del proyecto)
+
+                //Probar y añadir unicamente al prompt pero no al RAG.
+
                 depMethods = depClassInfo.getMethodSigs().keySet();
 
                 for (String sig : depMethods) {
@@ -508,6 +457,44 @@ public class SofiaHitsRunner extends MethodRunner {
     public static String removeLeadingJavadoc(String source) {
         return source.replaceFirst("(?s)^Analysing.*?\\R*/\\*.*?\\*/\\s*", "");
     }
+
+    public static void main(String[] args) {
+
+        String dummySourceCode = "";
+        dummySourceCode += "public class DummyClass {\n";
+        dummySourceCode += "    private int value;\n";
+        dummySourceCode += "\n";
+        dummySourceCode += "    public DummyClass(int value) {\n";
+        dummySourceCode += "        this.value = value;\n";
+        dummySourceCode += "    }\n";
+        dummySourceCode += "\n";
+        dummySourceCode += "    public int getValue() {\n";
+        dummySourceCode += "        return value;\n";
+        dummySourceCode += "    }\n";
+        dummySourceCode += "\n";
+        dummySourceCode += "    public void setValue(int value) {\n";
+        dummySourceCode += "        this.value = value;\n";
+        dummySourceCode += "    }\n";
+        dummySourceCode += "\n";
+        dummySourceCode += "    private void helperMethod() {\n";
+        dummySourceCode += "        System.out.println(\"Helper method\");\n";
+        dummySourceCode += "    }\n";
+        dummySourceCode += "}\n";
+
+        String className = "DummyClass";
+        List<String> methods = CodeParser.extractMethodsFromCode(className, dummySourceCode);
+
+        System.out.println("Extracted Methods:");
+        for (String methodCode : methods) {
+            System.out.println("Method Code:\n" + methodCode);
+            String firstLine = methodCode.split("\n")[0].trim();
+            String signature = CodeParser.extractSignature(firstLine);
+            System.out.println("Signature: " + signature);
+            System.out.println("----------------------------");
+        }
+    }
+
+
 
 }
 
