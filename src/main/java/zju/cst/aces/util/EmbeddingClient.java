@@ -113,7 +113,7 @@ public class EmbeddingClient {
         inputJson.put("comment", comment);
         inputJson.put("annotations", annotations);
         inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
-        System.out.println("Input JSON: " + inputJson.toString());
+        System.out.println("Code to be saved: " + signature);
         String response = sendPostRequest("save_code", inputJson.toString());
 
         return response != null ? new JSONObject(response) : null;
@@ -214,30 +214,29 @@ public class EmbeddingClient {
 
 
     public static void main(String[] args) {
-        EmbeddingClient client = new EmbeddingClient();
+    //     EmbeddingClient client = new EmbeddingClient();
 
-        // Prueba del método saveCode
-        String className = "DummyClass";
-        String methodName = "dummyMethod";
-        String code = "public void dummyMethod() { System.out.println(\"Hello, World!\"); }";
-        String signature = "void dummyMethod()";
-        String comment = "This is a dummy method.";
-        String annotations = "[\"Override\"]";
-        List<String> dependentMethods = new ArrayList<>();
-        dependentMethods.add("helperMethod");
+    //     // Prueba del método saveCode
+    //     String className = "DummyClass1";
+    //     String methodName = "dummyMethod1";
+    //     String code = "public void dummyMethod() { System.out.println(\"Hello, World!\"); }";
+    //     String signature = "void dummyMethod()1";
+    //     String comment = "This is a dummy method.1";
+    //     String annotations = "[\"Override\"]";
+    //     List<String> dependentMethods = new ArrayList<>();
+    //     dependentMethods.add("helperMethod");
 
-        JSONObject saveResponse = client.saveCode(className, methodName, code, signature, comment, annotations, dependentMethods);
-        System.out.println("Respuesta de saveCode: " + saveResponse);
+    //     JSONObject saveResponse = client.saveCode(className, methodName, code, signature, comment, annotations, dependentMethods);
+    //     System.out.println("Respuesta de saveCode: " + saveResponse);
 
-        // Prueba del método search_similar_methods
-        String searchCode = "public void dummyMethod() { System.out.println(\"Hello, World!\"); }";
-        int limit = 5;
+    //     // Prueba del método search_similar_methods
+    //     String searchCode = "public void dummyMethod() { System.out.println(\"Hello, Girl!\"); }";
+    //     int limit = 5;
 
-        List<MethodInfo> searchResults = client.search_similar_methods(searchCode, limit);
-        System.out.println("Resultados de search_similar_methods:");
-        for (MethodInfo methodInfo : searchResults) {
-            System.out.println(methodInfo);
-        }
-
+    //     List<MethodInfo> searchResults = client.search_similar_methods(searchCode, limit);
+    //     System.out.println("Resultados de search_similar_methods:");
+    //     for (MethodInfo methodInfo : searchResults) {
+    //         System.out.println(methodInfo);
+    //     }
     }
 }

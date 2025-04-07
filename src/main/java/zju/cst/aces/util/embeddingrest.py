@@ -134,12 +134,13 @@ def search_similar_methods():
             print("Class name or method name is empty")
             class_name = 'Dependency'
             method_name = method_name_from_code
-            print("Code: ", code)
+            print("Code: ", code )
+            print("Method name from code: ", method_name_from_code)
         else:
             print(f'Class: {class_name}, Method: {method_name}')
         
         max_neighbours = data.get('max_neighbours', 8)
-        similarity_threshold = 0.5
+        similarity_threshold = 0.75
 
         if not code:
             print("ERROR: Missing code")
@@ -178,6 +179,8 @@ def search_similar_methods():
                 "dependent_methods": meta.get("dependent_methods", []),
                 "similarity": round(similarity, 2)
             })
+            
+            print(f"RAG: Similarity: {similarity}, Class: {meta.get('class_name')}, Method: {meta.get('method_name')}")
 
             if len(matched_results) >= max_neighbours:
                 break
@@ -186,11 +189,7 @@ def search_similar_methods():
             print("No similar methods found\n\n")
             return jsonify({'error': 'No similar methods found'}), 404
         else:
-            print("Similar methods found:\n\n")
-            for result in matched_results:
-                print(result)
-            print("\n\n")
-        return jsonify({'results': matched_results})
+            return jsonify({'results': matched_results})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

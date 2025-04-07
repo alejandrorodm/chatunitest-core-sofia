@@ -160,4 +160,69 @@ public class CodeParser {
         }
     }
 
+    public static void main(String[] args) {
+        List<String> methods = extractMethodsFromCode("HTTP", "public class HttpEntity<T> {\r\n" + //
+                        "public static final HttpEntity<?> EMPTY = new HttpEntity();\r\n" + //
+                        "private final HttpHeaders headers;\r\n" + //
+                        "@Nullable\r\n" + //
+                        "private final T body;\r\n" + //
+                        "protected HttpEntity() {\r\n" + //
+                        "this(null, null);\r\n" + //
+                        "}\r\n" + //
+                        "public HttpEntity(T body) {\r\n" + //
+                        "this(body, null);\r\n" + //
+                        "}\r\n" + //
+                        "public HttpEntity(MultiValueMap<String, String> headers) {\r\n" + //
+                        "this(null, headers);\r\n" + //
+                        "}\r\n" + //
+                        "public HttpEntity(@Nullable T body, @Nullable MultiValueMap<String, String> headers) {\r\n" + //
+                        "this.body = body;\r\n" + //
+                        "HttpHeaders tempHeaders = new HttpHeaders();\r\n" + //
+                        "if (headers != null) {\r\n" + //
+                        "tempHeaders.putAll(headers);\r\n" + //
+                        "}\r\n" + //
+                        "this.headers = HttpHeaders.readOnlyHttpHeaders((HttpHeaders)tempHeaders);\r\n" + //
+                        "}\r\n" + //
+                        "public HttpHeaders getHeaders() {\r\n" + //
+                        "return this.headers;\r\n" + //
+                        "}\r\n" + //
+                        "@Nullable\r\n" + //
+                        "public T getBody() {\r\n" + //
+                        "return this.body;\r\n" + //
+                        "}\r\n" + //
+                        "public boolean hasBody() {\r\n" + //
+                        "return this.body != null;\r\n" + //
+                        "}\r\n" + //
+                        "public boolean equals(@Nullable Object other) {\r\n" + //
+                        "if (this == other) {\r\n" + //
+                        "return true;\r\n" + //
+                        "}\r\n" + //
+                        "if (other == null || other.getClass() != this.getClass()) {\r\n" + //
+                        "return false;\r\n" + //
+                        "}\r\n" + //
+                        "HttpEntity otherEntity = (HttpEntity)other;\r\n" + //
+                        "return ObjectUtils.nullSafeEquals((Object)this.headers, (Object)otherEntity.headers) && ObjectUtils.nullSafeEquals(this.body, otherEntity.body);\r\n" + //
+                        "}\r\n" + //
+                        "public int hashCode() {\r\n" + //
+                        "return ObjectUtils.nullSafeHashCode((Object)this.headers) * 29 + ObjectUtils.nullSafeHashCode(this.body);\r\n" + //
+                        "}\r\n" + //
+                        "public String toString() {\r\n" + //
+                        "StringBuilder builder = new StringBuilder(\"<\");\r\n" + //
+                        "if (this.body != null) {\r\n" + //
+                        "builder.append(this.body);\r\n" + //
+                        "builder.append(',');\r\n" + //
+                        "}\r\n" + //
+                        "builder.append(this.headers);\r\n" + //
+                        "builder.append('>');\r\n" + //
+                        "return builder.toString();\r\n" + //
+                        "}\r\n" + //
+                        "}\r\n" + //
+                        "");
+        for (String method : methods) {
+            System.out.println("Metodo:");
+            System.out.println(method);
+        }
+        System.out.println("===================================");
+    }
+
 }
