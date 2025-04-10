@@ -32,9 +32,13 @@ def check_if_id_exists(unique_id):
         
         # Comprobar si existe en la respuesta
         if existing and ids:
-            print(f"ID {unique_id} ya existe. Se omite.")
+            #print(f"(CHECK_ID) ID {unique_id} ya existe. Se omite.")
             return True # El ID ya existe, no se debe insertar
-        return False  # El ID no existe, se puede insertar
+        else:
+            #print(f"(CHECK_ID) ID {unique_id} no existe. Se puede insertar.")
+            #print(existing)
+            #print(f"Existing IDs: {ids}")
+            return False  # El ID no existe, se puede insertar
 
     except Exception as e:
         print(f"Error al comprobar existencia de ID {unique_id}: {e}")
@@ -71,15 +75,8 @@ def save_code():
         # Verificar si ya existe
         unique_id = class_name + '-' + signature  # Define unique_id
         
-        if check_if_id_exists(unique_id):
-            print("ID ya existe. Se omite.")
-        else:
-            print("ID no encontrado. Procediendo a agregarlo.")
-                        
+        if not check_if_id_exists(unique_id):
             embeddings = generate_embedding(code)
-            #print("COMPRUEBA QUE EFECTIVAMENTE NO EXISTA")
-            print(collection.get(ids=[unique_id]))
-            #print("FIN COMPROBACION")
             collection.add(
                 ids=[unique_id],
                 embeddings=[embeddings],
