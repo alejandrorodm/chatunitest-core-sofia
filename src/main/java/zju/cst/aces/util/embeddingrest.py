@@ -21,7 +21,6 @@ def generate_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
     outputs = model(**inputs)
     embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
-    embeddings = outputs.last_hidden_state.mean(dim=1).detach().numpy().tolist()[0]
     return embeddings
 
 def cosine_similarity(vec1, vec2):
@@ -51,9 +50,29 @@ def save_code():
         # To avoid errores on expected metadata value
         dependent_methods_str = json.dumps(dependent_methods)
         
+        # Verificar si ya existe
+        unique_id = class_name + '-' + signature  # Define unique_id
+        
+        try:
+            results = collection.query(
+                query_texts=[unique_id],  # Usamos el unique_id como texto de búsqueda
+                n_results=1,  # Solo necesitamos saber si existe o no
+            )
+            
+            # Si la consulta devuelve resultados, significa que ya existe
+            if results['ids']:
+                print(f"ID {unique_id} ya existe. Se omite.")
+                return jsonify({'message': 'Code already exists, skipping'}), 200
+            else:
+                print(f"ID {unique_id} no encontrado. Procediendo a agregarlo.")
+                
+        except Exception as e:
+            print(f"Error al comprobar existencia de ID {unique_id}: {e}")
+
         embeddings = generate_embedding(code)
+        
         collection.add(
-            ids=[class_name + '-' + signature],
+            ids=[unique_id],
             embeddings=[embeddings],
             metadatas=[{
                 "class_name": class_name,
@@ -92,15 +111,25 @@ def save_methods():
             if not method_name or not code:
                 return jsonify({'error': 'Missing method name or code'}), 400
 
+            # Verificar si ya existe
+            unique_id = class_name + '-' + method_name
+            try:
+                existing = collection.get(ids=[unique_id])
+                if existing and len(existing.get('ids', [])) > 0:
+                    print(f"ID {unique_id} ya existe. Se omite.")
+                    continue
+            except Exception as e:
+                print(f"Error al comprobar existencia de ID {unique_id}: {e}")
+                
             embeddings = generate_embedding(code)
+            
             collection.add(
-                ids=[class_name + '-' + method_name],
+                ids=[unique_id],
                 embeddings=[embeddings],
                 metadatas=[{
                     "class_name": class_name,
                     "method_name": method_name,
                     "signature": signature,
-                    "code": code,
                     "code": code,
                     "comment": comment,
                     "annotations": annotations,
@@ -152,7 +181,7 @@ def search_similar_methods():
         try:
             results = collection.query(
                 query_embeddings=[query_embedding],
-                n_results=max_neighbours * 2,  # Extra para filtrar mejor luego
+                n_results=max_neighbours,  
                 include=["metadatas", "embeddings"]
             )
         except Exception as e:
