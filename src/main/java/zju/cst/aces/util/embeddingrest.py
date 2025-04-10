@@ -14,8 +14,8 @@ chroma_client = chromadb.PersistentClient()
 collection = chroma_client.get_or_create_collection(name="codebase")
 
 # Cargar el modelo
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-model = AutoModel.from_pretrained("bert-base-uncased")
+tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base")
+model = AutoModel.from_pretrained("microsoft/codebert-base")
 
 def generate_embedding(text):
     inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
@@ -193,6 +193,24 @@ def search_similar_methods():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/count_code_lines', methods=['GET'])
+def count_code_lines():
+    try:
+        # Retrieve all items in the collection
+        results = collection.get(include=["metadatas"])
+        total_lines = 0
+
+        # Sum up the lines of code from all stored methods
+        for metadata in results["metadatas"]:
+            code = metadata.get("code", "")
+            total_lines += len(code.splitlines())
+
+        return jsonify({'total_lines': total_lines})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     print("Server is starting on http://127.0.0.1:5000")
