@@ -87,7 +87,8 @@ def save_code():
                     "code": code,
                     "comment": comment,
                     "annotations": annotations,
-                    "dependent_methods": dependent_methods_str
+                    "dependent_methods": dependent_methods_str,
+                    "is_constructor": method_name == class_name  # Constructor check
                 }]
             )
         return jsonify({'message': 'Code saved successfully'})
@@ -139,12 +140,14 @@ def save_methods():
                     "code": code,
                     "comment": comment,
                     "annotations": annotations,
-                    "dependent_methods": dependent_methods
+                    "dependent_methods": dependent_methods,
+                    "is_constructor": method_name == class_name ## Constructor check
                 }]
             )
         return jsonify({'message': 'Methods saved successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 def extract_method_name(code):
     # Regex to match method definitions in Java
@@ -152,6 +155,38 @@ def extract_method_name(code):
     if match:
         return match.group(1)
     return None
+
+def agrupar_vecinos_por_clase(results, collection):
+    vecinos_por_clase = {}
+
+    metadatas = results["metadatas"][0]
+    for metadata in metadatas:
+        class_name = metadata["class_name"]
+        if class_name not in vecinos_por_clase:
+            vecinos_por_clase[class_name] = {
+                "constructor": None,
+                "methods": []
+            }
+        
+        if metadata.get("is_constructor", False):
+            vecinos_por_clase[class_name]["constructor"] = metadata["code"]
+        else:
+            vecinos_por_clase[class_name]["methods"].append(metadata["code"])
+
+    # Buscar constructor si no está
+    for clase, datos in vecinos_por_clase.items():
+        if datos["constructor"] is None:
+            try:
+                posibles = collection.get(
+                    where={"class_name": clase, "is_constructor": True}
+                )
+                if posibles and posibles["metadatas"]:
+                    datos["constructor"] = posibles["metadatas"][0]["code"]
+            except Exception as e:
+                print(f"Error buscando constructor para {clase}: {e}")
+    
+    return vecinos_por_clase
+
         
 @app.route('/search_similar_methods', methods=['POST'])
 def search_similar_methods():
@@ -190,6 +225,9 @@ def search_similar_methods():
                 n_results=max_neighbours,  
                 include=["metadatas", "embeddings"]
             )
+            
+            results = agrupar_vecinos_por_clase(results, collection)
+            
         except Exception as e:
             print(f"Error retrieving similar methods: {e}")
             return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
@@ -212,7 +250,8 @@ def search_similar_methods():
                 "comment": meta.get("comment"),
                 "annotations": meta.get("annotations"),
                 "dependent_methods": meta.get("dependent_methods", []),
-                "similarity": round(similarity, 2)
+                "similarity": round(similarity, 2),
+                "is_constructor": meta.get("is_constructor", False),
             })
             
             print(f"RAG: Similarity: {similarity}, Class: {meta.get('class_name')}, Method: {meta.get('method_name')}")
