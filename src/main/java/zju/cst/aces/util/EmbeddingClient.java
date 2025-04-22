@@ -113,6 +113,7 @@ public class EmbeddingClient {
         inputJson.put("comment", comment);
         inputJson.put("annotations", annotations);
         inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
+        inputJson.put("is_constructor", methodName.equals(className)); // true si es constructor, false si no
         System.out.println("Code to be saved: " + signature);
         String response = sendPostRequest("save_code", inputJson.toString());
 
@@ -171,15 +172,15 @@ public class EmbeddingClient {
         return results;
     }
 
-    public List<MethodInfo> search_similar_methods(String code, int limit) {
+    public Map<String, List<MethodInfo>> search_similar_methods(String code, int limit) {
         String inputJson = new JSONObject()
                 .put("code", code)
                 .put("max_neighbours", limit)
                 .toString();
-
+    
         String response = sendPostRequest("search_similar_methods", inputJson);
-        List<MethodInfo> results = new ArrayList<>();
-
+        Map<String, List<MethodInfo>> methodsByClass = new HashMap<>();
+    
         if (response != null) {
             System.out.println("Response: " + response + " code: " + code + "\n\n");
             JSONObject jsonResponse = new JSONObject(response);
@@ -187,30 +188,36 @@ public class EmbeddingClient {
                 JSONArray jsonResults = jsonResponse.getJSONArray("results");
                 for (int i = 0; i < jsonResults.length(); i++) {
                     JSONObject result = jsonResults.getJSONObject(i);
-
-                    // Convertir dependencias a un Map<String, Set<String>> vacío por ahora (puedes mejorarlo si necesitas)
+    
+                    String className = result.optString("class_name", "");
+    
+                    // Convertir dependencias a un Map<String, Set<String>> vacío por ahora
                     Map<String, Set<String>> dependentMethods = new HashMap<>();
-
+    
                     MethodInfo methodInfo = new MethodInfo(
-                            result.optString("class_name", ""),
+                            className,
                             result.optString("method_name", ""),
-                            "",  // `brief`, no está en la respuesta JSON
+                            "",  // `brief`
                             result.optString("signature", ""),
                             result.optString("code", ""),
-                            null, // `parameters`, no está en la respuesta JSON
+                            null,  // `parameters`
                             dependentMethods,
-                            "",  // `full_method_info`, no está en la respuesta JSON
+                            "",  // `full_method_info`
                             result.optString("comment", ""),
-                            result.optString("annotations", ""), response
+                            result.optString("annotations", ""),
+                            response
                     );
-
-                    results.add(methodInfo);
+    
+                    // Añadir al mapa por clase
+                    methodsByClass
+                        .computeIfAbsent(className, k -> new ArrayList<>())
+                        .add(methodInfo);
                 }
             }
         }
-        return results;
-    }
-
+    
+        return methodsByClass;
+    }    
 
 
     public static void main(String[] args) {

@@ -156,36 +156,28 @@ def extract_method_name(code):
         return match.group(1)
     return None
 
-def agrupar_vecinos_por_clase(results, collection):
-    vecinos_por_clase = {}
+# def agrupar_vecinos_por_clase(results):
+#     vecinos_por_clase = {}
 
-    metadatas = results["metadatas"][0]
-    for metadata in metadatas:
-        class_name = metadata["class_name"]
-        if class_name not in vecinos_por_clase:
-            vecinos_por_clase[class_name] = {
-                "constructor": None,
-                "methods": []
-            }
-        
-        if metadata.get("is_constructor", False):
-            vecinos_por_clase[class_name]["constructor"] = metadata["code"]
-        else:
-            vecinos_por_clase[class_name]["methods"].append(metadata["code"])
+#     metadatas = results["metadatas"][0]  # Lista de diccionarios, uno por resultado
 
-    # Buscar constructor si no está
-    for clase, datos in vecinos_por_clase.items():
-        if datos["constructor"] is None:
-            try:
-                posibles = collection.get(
-                    where={"class_name": clase, "is_constructor": True}
-                )
-                if posibles and posibles["metadatas"]:
-                    datos["constructor"] = posibles["metadatas"][0]["code"]
-            except Exception as e:
-                print(f"Error buscando constructor para {clase}: {e}")
-    
-    return vecinos_por_clase
+#     for metadata in metadatas:
+#         class_name = metadata["class_name"]
+#         is_constructor = metadata.get("is_constructor", False)
+
+#         if class_name not in vecinos_por_clase:
+#             vecinos_por_clase[class_name] = {
+#                 "constructor": None,
+#                 "methods": []
+#             }
+
+#         if is_constructor:
+#             vecinos_por_clase[class_name]["constructor"] = metadata["code"]
+#         else:
+#             vecinos_por_clase[class_name]["methods"].append(metadata["code"])
+
+#     return vecinos_por_clase
+
 
         
 @app.route('/search_similar_methods', methods=['POST'])
@@ -225,9 +217,7 @@ def search_similar_methods():
                 n_results=max_neighbours,  
                 include=["metadatas", "embeddings"]
             )
-            
-            results = agrupar_vecinos_por_clase(results, collection)
-            
+                        
         except Exception as e:
             print(f"Error retrieving similar methods: {e}")
             return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500

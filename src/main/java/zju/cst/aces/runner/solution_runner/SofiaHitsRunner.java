@@ -186,11 +186,17 @@ public class SofiaHitsRunner extends MethodRunner {
             //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
         }
 
-        //COMPROBAR FUNCIONAMIENTO
-        List <MethodInfo> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 250);
-        for(MethodInfo meth : rag_results) {
-            System.out.println("RAG: " + meth.getMethodName() + " " + meth.getSourceCode() + "\n");
-            promptInfo.addExternalMethodDeps(meth.getClassName(), meth.getSourceCode());;
+        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 250);
+        
+
+        //MEJOR AÑADIRLO AQUI O AL CONTEXT????
+        for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
+            String key = entry.getKey();
+            List<MethodInfo> methods = entry.getValue();
+            for (MethodInfo method : methods) {
+                System.out.println("RAG Key: " + key + ", Method: " + method.getMethodName() + " " + method.getSourceCode() + "\n");
+                promptInfo.addExternalMethodDeps(method.getClassName(), method.getSourceCode());
+            }
         }
 
         String fields = joinLines(classInfo.fields);
