@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.nio.file.Path;
 
 import zju.cst.aces.dto.ClassInfo;
 
@@ -46,41 +47,61 @@ public class SofiaHitsRunner extends MethodRunner {
      * @return If the generation process is successful
      */
     @Override
-    public boolean startRounds(final int num) {
-        PhaseImpl phase = PhaseImpl.createPhase(config);
-        config.useSlice = true;
+public boolean startRounds(final int num) {
+    PhaseImpl phase = PhaseImpl.createPhase(config);
+    config.useSlice = true;
 
-        // Prompt Construction Phase
-        PromptConstructorImpl pc = phase.generatePrompt(classInfo, methodInfo,num);
-        PromptInfo promptInfo = pc.getPromptInfo();
-        promptInfo.setRound(0);
+    // Prompt Construction Phase
+    PromptConstructorImpl pc = phase.generatePrompt(classInfo, methodInfo, num);
+    PromptInfo promptInfo = pc.getPromptInfo();
+    promptInfo.setRound(0);
 
-        SOFIA_HITS phase_hits = (SOFIA_HITS) phase;
+    SOFIA_HITS phase_hits = (SOFIA_HITS) phase;
 
-        long startTime = System.nanoTime();
+    long startTime = System.nanoTime();
+
+    try {
         if (config.isEnableObfuscate()) {
             Obfuscator obfuscator = new Obfuscator(config);
             PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
             obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
-
             phase_hits.generateMethodSlice(pc);
         } else {
             phase_hits.generateMethodSlice(pc);
         }
+    } catch (Exception e) {
+        System.err.println("Error durante la generación de slice: " + e.getMessage());
+        e.printStackTrace();
+        return false;
+    }
 
-        int successCount = 0;
-        JsonResponseProcessor.JsonData methodSliceInfo = JsonResponseProcessor.readJsonFromFile(promptInfo.getMethodSlicePath().resolve("slice.json"));
-        if (methodSliceInfo != null) {
-            // Accessing the steps
-            boolean hasErrors = false;
-            for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
-                // Test Generation Phase
+    int successCount = 0;
+    JsonResponseProcessor.JsonData methodSliceInfo = null;
+    try {
+        Path slicePath = promptInfo.getMethodSlicePath();
+        if (slicePath == null) {
+            System.err.println("Error: methodSlicePath es null.");
+            return false;
+        }
+
+        methodSliceInfo = JsonResponseProcessor.readJsonFromFile(slicePath.resolve("slice.json"));
+        if (methodSliceInfo == null || methodSliceInfo.getSteps() == null) {
+            System.err.println("slice.json no encontrado o vacío.");
+            return false;
+        }
+
+        boolean hasErrors = false;
+
+        for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
+            try {
                 hasErrors = false;
                 if (methodSliceInfo.getSteps().get(i) == null) continue;
+
                 promptInfo.setSliceNum(i);
-                promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i)); // todo 存储切片信息到promptInfo
-                phase_hits.generateSliceTest(pc); //todo 改成新的hits对切片生成单元测试方法
-                // Validation
+                promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i));
+
+                phase_hits.generateSliceTest(pc);
+
                 if (phase_hits.validateTest(pc)) {
                     successCount++;
                     exportRecord(pc.getPromptInfo(), classInfo, num);
@@ -88,36 +109,42 @@ public class SofiaHitsRunner extends MethodRunner {
                 } else {
                     hasErrors = true;
                 }
+
                 if (hasErrors) {
-                    // Validation and Repair Phase
                     for (int rounds = 1; rounds < config.getMaxRounds(); rounds++) {
-
                         promptInfo.setRound(rounds);
-
-                        // Repair
                         phase_hits.generateSliceTest(pc);
-                        // Validation and process
-                        if (phase_hits.validateTest(pc)) { // if passed validation
+                        if (phase_hits.validateTest(pc)) {
                             successCount++;
                             exportRecord(pc.getPromptInfo(), classInfo, num);
                             hasErrors = false;
-                            break; // successfully
+                            break;
                         }
-
                     }
                 }
 
-                exportSliceRecord(pc.getPromptInfo(), classInfo, num, i); //todo 检测是否顺利生成信息
+                exportSliceRecord(pc.getPromptInfo(), classInfo, num, i);
+            } catch (Exception e) {
+                System.err.println("Error procesando el slice #" + i + ": " + e.getMessage());
+                e.printStackTrace();
             }
-            if (config.generateJsonReport) {
-                long endTime = System.nanoTime();
-                float duration = (float) (endTime - startTime) / 1_000_000_000;
-                generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
-            }
-            return !hasErrors;
         }
-        return true;
+
+        if (config.generateJsonReport) {
+            long endTime = System.nanoTime();
+            float duration = (float) (endTime - startTime) / 1_000_000_000;
+            generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
+        }
+
+        return !hasErrors;
+    } catch (Exception e) {
+        System.err.println("Error general durante el procesamiento de los slices: " + e.getMessage());
+        e.printStackTrace();
     }
+
+    return false;
+}
+
 
     /*
     Just in case the constructor is not invoked before 'generatePromptInfoWithDep'
@@ -216,6 +243,8 @@ public class SofiaHitsRunner extends MethodRunner {
         }
 
         // GET SOURCE CODE ES PARA DEPENDENCIAS JAR 
+
+        
 //        if (methodInfo.useField) {
 //            information += fields + "\n";
 //            otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
