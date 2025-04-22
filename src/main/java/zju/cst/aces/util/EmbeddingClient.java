@@ -77,6 +77,33 @@ public class EmbeddingClient {
         // }            
     }
 
+    private String sendGetRequest(String endpoint) {
+        try {
+            URL url = new URL(BASE_URL + "/" + endpoint);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+    
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+                String inputLine;
+    
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+    
+                in.close();
+                return response.toString();
+            } else {
+                System.err.println("GET request failed: " + responseCode);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
     private String sendPostRequest(String endpoint, String inputJson) {
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(BASE_URL + endpoint).openConnection();
@@ -219,7 +246,19 @@ public class EmbeddingClient {
         return methodsByClass;
     }    
 
-
+    public int countElements() {
+        String response = sendGetRequest("count_elements");
+        if (response != null) {
+            JSONObject jsonResponse = new JSONObject(response);
+            if (jsonResponse.has("total_elements")) {
+                return jsonResponse.getInt("total_elements");
+            } else if (jsonResponse.has("error")) {
+                System.err.println("Error al contar elementos: " + jsonResponse.getString("error"));
+            }
+        }
+        return -1; // Indicador de error
+    }
+    
     public static void main(String[] args) {
     //     EmbeddingClient client = new EmbeddingClient();
 

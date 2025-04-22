@@ -259,19 +259,12 @@ def search_similar_methods():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/count_code_lines', methods=['GET'])
-def count_code_lines():
+@app.route('/count_elements', methods=['GET'])
+def count_elements():
     try:
-        # Retrieve all items in the collection
         results = collection.get(include=["metadatas"])
-        total_lines = 0
-
-        # Sum up the lines of code from all stored methods
-        for metadata in results["metadatas"]:
-            code = metadata.get("code", "")
-            total_lines += len(code.splitlines())
-
-        return jsonify({'total_lines': total_lines})
+        total_elements = len(results["metadatas"])
+        return jsonify({'total_elements': total_elements})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

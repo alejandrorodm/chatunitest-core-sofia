@@ -186,7 +186,8 @@ public class SofiaHitsRunner extends MethodRunner {
             //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
         }
 
-        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), 250);
+        int num_elements = (int) (embeddingClient.countElements() * 0.5);
+        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
         
 
         //MEJOR AÑADIRLO AQUI O AL CONTEXT????
