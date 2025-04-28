@@ -460,6 +460,8 @@ public abstract class AbstractRunner {
             Map<String, String> map = new LinkedHashMap<>();
             String fullTestName = fullNamePrefix + i + "_Test";
             map.put("testClassName", fullTestName.substring(fullTestName.lastIndexOf(".") + 1));
+            map.put("projectName", config.project.getArtifactId());
+            map.put("phaseType", config.phaseType);
             map.put("fullName", fullTestName);
             map.put("path", promptInfo.getTestPath().toString());
             map.put("className", promptInfo.className);
@@ -512,6 +514,8 @@ public abstract class AbstractRunner {
             Map<String, String> map = new LinkedHashMap<>();
             String fullTestName = fullNamePrefix + i + "_Test";
             map.put("testClassName", fullTestName.substring(fullTestName.lastIndexOf(".") + 1));
+            map.put("projectName", config.project.getArtifactId());
+            map.put("phaseType", config.phaseType);
             map.put("fullName", fullTestName);
             map.put("path", promptInfo.getTestPath().toString());
             map.put("className", promptInfo.className);

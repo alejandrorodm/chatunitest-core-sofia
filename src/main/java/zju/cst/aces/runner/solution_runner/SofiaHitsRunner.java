@@ -2,8 +2,6 @@ package zju.cst.aces.runner.solution_runner;
 
 import org.benf.cfr.reader.api.CfrDriver;
 import org.benf.cfr.reader.api.OutputSinkFactory;
-import org.json.JSONObject;
-
 import zju.cst.aces.api.Logger;
 import zju.cst.aces.api.config.Config;
 import zju.cst.aces.api.impl.PromptConstructorImpl;
@@ -13,26 +11,19 @@ import zju.cst.aces.api.phase.solution.SOFIA_HITS;
 import zju.cst.aces.dto.ClassInfo;
 import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.PromptInfo;
-import zju.cst.aces.parser.CodeParser;
 import zju.cst.aces.runner.MethodRunner;
-import zju.cst.aces.util.EmbeddingClient;
 import zju.cst.aces.util.JsonResponseProcessor;
 
 import java.io.*;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.nio.file.Path;
-
-import zju.cst.aces.dto.ClassInfo;
 
 public class SofiaHitsRunner extends MethodRunner {
 
     private static List<String> dependencies;
     private static Logger logger;
-    private static EmbeddingClient embeddingClient = new EmbeddingClient();
 
     public SofiaHitsRunner(Config config, String fullClassName, MethodInfo methodInfo) throws IOException {
         super(config, fullClassName, methodInfo);
@@ -47,61 +38,41 @@ public class SofiaHitsRunner extends MethodRunner {
      * @return If the generation process is successful
      */
     @Override
-public boolean startRounds(final int num) {
-    PhaseImpl phase = PhaseImpl.createPhase(config);
-    config.useSlice = true;
+    public boolean startRounds(final int num) {
+        PhaseImpl phase = PhaseImpl.createPhase(config);
+        config.useSlice = true;
 
-    // Prompt Construction Phase
-    PromptConstructorImpl pc = phase.generatePrompt(classInfo, methodInfo, num);
-    PromptInfo promptInfo = pc.getPromptInfo();
-    promptInfo.setRound(0);
+        // Prompt Construction Phase
+        PromptConstructorImpl pc = phase.generatePrompt(classInfo, methodInfo,num);
+        PromptInfo promptInfo = pc.getPromptInfo();
+        promptInfo.setRound(0);
 
-    SOFIA_HITS phase_hits = (SOFIA_HITS) phase;
+        SOFIA_HITS phase_hits = (SOFIA_HITS) phase;
 
-    long startTime = System.nanoTime();
-
-    try {
+        long startTime = System.nanoTime();
         if (config.isEnableObfuscate()) {
             Obfuscator obfuscator = new Obfuscator(config);
             PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
             obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
+
             phase_hits.generateMethodSlice(pc);
         } else {
             phase_hits.generateMethodSlice(pc);
         }
-    } catch (Exception e) {
-        System.err.println("Error durante la generación de slice: " + e.getMessage());
-        e.printStackTrace();
-        return false;
-    }
 
-    int successCount = 0;
-    JsonResponseProcessor.JsonData methodSliceInfo = null;
-    try {
-        Path slicePath = promptInfo.getMethodSlicePath();
-        if (slicePath == null) {
-            System.err.println("Error: methodSlicePath es null.");
-            return false;
-        }
-
-        methodSliceInfo = JsonResponseProcessor.readJsonFromFile(slicePath.resolve("slice.json"));
-        if (methodSliceInfo == null || methodSliceInfo.getSteps() == null) {
-            System.err.println("slice.json no encontrado o vacío.");
-            return false;
-        }
-
-        boolean hasErrors = false;
-
-        for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
-            try {
+        int successCount = 0;
+        JsonResponseProcessor.JsonData methodSliceInfo = JsonResponseProcessor.readJsonFromFile(promptInfo.getMethodSlicePath().resolve("slice.json"));
+        if (methodSliceInfo != null) {
+            // Accessing the steps
+            boolean hasErrors = false;
+            for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
+                // Test Generation Phase
                 hasErrors = false;
                 if (methodSliceInfo.getSteps().get(i) == null) continue;
-
                 promptInfo.setSliceNum(i);
-                promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i));
-
-                phase_hits.generateSliceTest(pc);
-
+                promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i)); // todo 存储切片信息到promptInfo
+                phase_hits.generateSliceTest(pc); //todo 改成新的hits对切片生成单元测试方法
+                // Validation
                 if (phase_hits.validateTest(pc)) {
                     successCount++;
                     exportRecord(pc.getPromptInfo(), classInfo, num);
@@ -109,42 +80,36 @@ public boolean startRounds(final int num) {
                 } else {
                     hasErrors = true;
                 }
-
                 if (hasErrors) {
+                    // Validation and Repair Phase
                     for (int rounds = 1; rounds < config.getMaxRounds(); rounds++) {
+
                         promptInfo.setRound(rounds);
+
+                        // Repair
                         phase_hits.generateSliceTest(pc);
-                        if (phase_hits.validateTest(pc)) {
+                        // Validation and process
+                        if (phase_hits.validateTest(pc)) { // if passed validation
                             successCount++;
                             exportRecord(pc.getPromptInfo(), classInfo, num);
                             hasErrors = false;
-                            break;
+                            break; // successfully
                         }
+
                     }
                 }
 
-                exportSliceRecord(pc.getPromptInfo(), classInfo, num, i);
-            } catch (Exception e) {
-                System.err.println("Error procesando el slice #" + i + ": " + e.getMessage());
-                e.printStackTrace();
+                exportSliceRecord(pc.getPromptInfo(), classInfo, num, i); //todo 检测是否顺利生成信息
             }
+            if (config.generateJsonReport) {
+                long endTime = System.nanoTime();
+                float duration = (float) (endTime - startTime) / 1_000_000_000;
+                generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
+            }
+            return !hasErrors;
         }
-
-        if (config.generateJsonReport) {
-            long endTime = System.nanoTime();
-            float duration = (float) (endTime - startTime) / 1_000_000_000;
-            generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
-        }
-
-        return !hasErrors;
-    } catch (Exception e) {
-        System.err.println("Error general durante el procesamiento de los slices: " + e.getMessage());
-        e.printStackTrace();
+        return true;
     }
-
-    return false;
-}
-
 
     /*
     Just in case the constructor is not invoked before 'generatePromptInfoWithDep'
@@ -165,9 +130,6 @@ public boolean startRounds(final int num) {
         List<String> otherBriefMethods = new ArrayList<>();
         List<String> otherMethodBodies = new ArrayList<>();
 
-
-        System.out.println("Prompt para " + classInfo.getFullClassName() + " " + methodInfo.getMethodName());
-
         for (Map.Entry<String, Set<String>> entry : classInfo.constructorDeps.entrySet()) {
             String depClassName = entry.getKey();
             Set<String> depMethods = entry.getValue();
@@ -181,9 +143,7 @@ public boolean startRounds(final int num) {
 
         for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
             String depClassName = entry.getKey();
-            System.out.println("depClassName: " + depClassName);
-            
-            if (depClassName.equals(classInfo.getFullClassName())) {
+            if (depClassName.equals(classInfo.getClassName())) {
                 Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
                 for (String otherMethod : otherSig) {
                     MethodInfo otherMethodInfo = getMethodInfo(config, classInfo, otherMethod);
@@ -196,35 +156,11 @@ public boolean startRounds(final int num) {
                 }
                 continue;
             }
+
             Set<String> depMethods = entry.getValue();
-            System.out.println("DEPMETHODS " + depMethods.toString());
-
-            //Guardar en la base de datos vectorial
-
-            //METHODDEPS DA VACIO
             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-
-            SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo);
-            //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
-            //saveDepInfo(config, depClassName, depMethods, promptInfo);
+            promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
-
-            //promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-            //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
-        }
-
-        int num_elements = (int) (embeddingClient.countElements() * 0.5);
-        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
-        
-
-        //MEJOR AÑADIRLO AQUI O AL CONTEXT????
-        for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
-            String key = entry.getKey();
-            List<MethodInfo> methods = entry.getValue();
-            for (MethodInfo method : methods) {
-                System.out.println("RAG Key: " + key + ", Method: " + method.getMethodName() + " " + method.getSourceCode() + "\n");
-                promptInfo.addExternalMethodDeps(method.getClassName(), method.getSourceCode());
-            }
         }
 
         String fields = joinLines(classInfo.fields);
@@ -241,10 +177,6 @@ public boolean startRounds(final int num) {
             otherMethods += joinLines(classInfo.constructorBrief) + "\n";
             otherFullMethods += getBodies(config, classInfo, classInfo.constructorSigs) + "\n";
         }
-
-        // GET SOURCE CODE ES PARA DEPENDENCIAS JAR 
-
-        
 //        if (methodInfo.useField) {
 //            information += fields + "\n";
 //            otherMethods +=  joinLines(classInfo.getterSetterBrief) + "\n";
@@ -262,165 +194,17 @@ public boolean startRounds(final int num) {
         promptInfo.setOtherMethodBrief(otherMethods);
         promptInfo.setOtherMethodBodies(otherFullMethods);
 
-        System.out.println("PromptInfo (EXTERNALMETHODDEPS): " + promptInfo.getExternalMethodDeps().toString());
-        System.out.println("PromptInfo (METHODDEPS): " + promptInfo.getMethodDeps().toString()); //metodos dependientes de la MISMA CLASE
-
         return promptInfo;
-    }
-
-    public static void storeDepMethods(Config config, String depClassName, Set<String> depMethods) throws IOException {
-        ClassInfo depClassInfo = getClassInfo(config, depClassName);
-        if (depClassInfo == null) return;
-
-        for (String sig : depMethods) {
-            MethodInfo depMethodInfo = getMethodInfo(config, depClassInfo, sig);
-            if (depMethodInfo == null) continue;
-
-            String methodCode = depMethodInfo.getSourceCode();
-            if (methodCode.isEmpty()) continue;
-        }
-    }
-
-
-    // public static void addMethodDepsByDepth(Config config, String className, Set<String> methodSigs, PromptInfo promptInfo, int depth) throws IOException {
-    //     if (depth <= 1) {
-    //         return;
-    //     }
-    
-    //     Set<String> processedMethods = new HashSet<>(); // Evita procesar el mismo método más de una vez
-    
-    //     for (String dm : methodSigs) {
-    //         System.out.println("\nMetodo dependiente por profundidad: " + dm + "\n");
-    //         ClassInfo depClassInfo = getClassInfo(config, className);
-    //         if (depClassInfo == null) {
-    //             continue;
-    //         }
-    
-    //         addConstructorDepsByDepth(config, depClassInfo, promptInfo); // Agregar dependencias de constructores
-    
-    //         MethodInfo depMethodInfo = getMethodInfo(config, depClassInfo, dm);
-    //         if (depMethodInfo == null || processedMethods.contains(depMethodInfo.getMethodSignature())) {
-    //             continue;
-    //         }
-    //         processedMethods.add(depMethodInfo.getMethodSignature()); // Marcar método como procesado
-    
-    //         // Lista de métodos dependientes
-    //         List<String> dependent_methods_list = new ArrayList<>();
-    
-    //         for (String depClassName : depMethodInfo.dependentMethods.keySet()) {
-    //             Set<String> depMethods = depMethodInfo.dependentMethods.get(depClassName);
-
-    //             for (String depMethodSig : depMethods) {
-    //                 MethodInfo dependentMethod = getMethodInfo(config, getClassInfo(config, depClassName), depMethodSig);
-    //                 if (dependentMethod != null) {
-    //                     dependent_methods_list.add(dependentMethod.getMethodSignature());
-    //                 }
-
-    //             }
-    //             System.out.println("Saving method: " + depMethodInfo.getMethodName() + " with dependencies: " + dependent_methods_list);
-
-
-    //             // Guardar método en la base de datos con sus dependencias
-    //             JSONObject response = embeddingClient.saveCode(
-    //                 className,
-    //                 depMethodInfo.getMethodName(),
-    //                 depMethodInfo.getSourceCode(),
-    //                 depMethodInfo.getMethodSignature(),
-    //                 depMethodInfo.getMethod_comment(),
-    //                 depMethodInfo.getMethod_annotation(),
-    //                 dependent_methods_list
-    //             );
-
-    //             if (response == null) {
-    //                 logger.error("Error al guardar el método: " + depMethodInfo.getMethodName());
-    //                 return ;
-    //             }else{
-    //                 System.out.println("Method saved successfully: " + depMethodInfo.getMethodName());
-    //                 System.out.println("Response: " + response.toString());
-    //             }
-
-    //             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-    //             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, depth - 1);
-    //         }
-    //     }
-    // }
-
-    //Ahora mismo getDepInfo deberia hacer esta funcion
-    public static String saveDepInfo(Config config, String depClassName, Set<String> depMethods, PromptInfo promptInfo) throws IOException {
-
-        try{
-            ClassInfo depClassInfo = getClassInfo(config, depClassName);
-
-            if (depClassInfo == null) {
-                try {
-                    String sourceCode = getSourceCode(depClassName);
-                    if (sourceCode != null) {
-                        promptInfo.incrementSofiaActivations();
-                        System.out.println("No se ha podido convertir a ClassInfo " + depClassName);
-                        CodeParser.saveExtractedMethods(depClassName, sourceCode);
-                    }
-                    return sourceCode;
-                } catch (Exception e) {
-                    return null;
-                }
-            } else {
-                depMethods = depClassInfo.getMethodSigs().keySet();
-
-                for (String sig : depMethods) {
-                    MethodInfo depMethodInfo = getMethodInfo(config, depClassInfo, sig);
-                    if (depMethodInfo == null) {
-                        continue;
-                    }else{
-                        System.out.println("(saveDepInfo) Saving method: " + depMethodInfo.getMethodName());
-                        // Guardar método en la base de datos vectorial
-                        JSONObject response = embeddingClient.saveCode(
-                            depClassName,
-                            depMethodInfo.getMethodName(),
-                            depMethodInfo.getSourceCode(),
-                            depMethodInfo.getMethodSignature(),
-                            depMethodInfo.getMethod_comment(),
-                            depMethodInfo.getMethod_annotation(),
-                            new ArrayList<>(depMethodInfo.getDependentMethods().keySet())
-                        );
-                    }
-                }
-                return "OK" + depClassInfo.toString();
-            }
-        }catch (Exception e) {
-            System.out.println("Error al guardar el método: " + e.getMessage());
-            return null;
-        }
-        //     // Dependencias del metodo
-        // List<String> dependent_methods_list = new ArrayList<>();
-
-        // for (String sig : depMethods) {
-        //     MethodInfo depMethodInfo = getMethodInfo(config, depClassInfo, sig);
-        //     if (depMethodInfo == null) {
-        //         continue;
-        //     }
-
-        //     // Guardar dependencias del método (pero no sus códigos)
-        //     if (depMethodInfo.getDependentMethods() != null) {
-        //         for (String depMethodSig : depMethodInfo.getDependentMethods().keySet()) {
-        //             MethodInfo dependentMethod = getMethodInfo(config, depClassInfo, depMethodSig);
-        //             if (dependentMethod != null) {
-        //                 dependent_methods_list.add(dependentMethod.getMethodSignature());
-        //             }
-        //         }
-        //     }
-        
     }
 
     public static String getDepInfo(Config config, String depClassName, PromptInfo promptInfo) throws IOException {
         ClassInfo depClassInfo = getClassInfo(config, depClassName);
-        System.out.println("getDepInfo: " + depClassName);
         if (depClassInfo == null) {
             try {
                 String sourceCode = getSourceCode(depClassName);
                 if (sourceCode != null) {
                     promptInfo.incrementSofiaActivations();
                 }
-                CodeParser.saveExtractedMethods(depClassName, sourceCode);
                 return sourceCode;
             } catch (Exception e) {
                 return null;
