@@ -44,6 +44,8 @@ public class EmbeddingClient {
             return false;
         }
     }
+
+    // AÑADIR METODOS DE LA CABECERA AL RAG
     
     public void startPythonServer() {
         // if(isServerRunning()){
@@ -141,8 +143,12 @@ public class EmbeddingClient {
         inputJson.put("annotations", annotations);
         inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
         inputJson.put("is_constructor", methodName.equals(className)); // true si es constructor, false si no
-        System.out.println("Code to be saved: " + signature);
+        //System.out.println("Code to be saved: " + signature);
         String response = sendPostRequest("save_code", inputJson.toString());
+
+        if(response == null) {
+            System.out.println("Error al guardar el código: " + response);
+        } 
 
         return response != null ? new JSONObject(response) : null;
     }
@@ -209,7 +215,7 @@ public class EmbeddingClient {
         Map<String, List<MethodInfo>> methodsByClass = new HashMap<>();
     
         if (response != null) {
-            System.out.println("Response: " + response + " code: " + code + "\n\n");
+            //System.out.println("Response: " + response + " code: " + code + "\n\n");
             JSONObject jsonResponse = new JSONObject(response);
             if (jsonResponse.has("results")) {
                 JSONArray jsonResults = jsonResponse.getJSONArray("results");

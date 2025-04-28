@@ -11,8 +11,10 @@ import zju.cst.aces.api.phase.solution.SOFIA_HITS;
 import zju.cst.aces.dto.ClassInfo;
 import zju.cst.aces.dto.MethodInfo;
 import zju.cst.aces.dto.PromptInfo;
+import zju.cst.aces.parser.CodeParser;
 import zju.cst.aces.runner.MethodRunner;
 import zju.cst.aces.util.JsonResponseProcessor;
+import zju.cst.aces.util.EmbeddingClient;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -24,6 +26,7 @@ public class SofiaHitsRunner extends MethodRunner {
 
     private static List<String> dependencies;
     private static Logger logger;
+    public static EmbeddingClient embeddingClient = new EmbeddingClient();
 
     public SofiaHitsRunner(Config config, String fullClassName, MethodInfo methodInfo) throws IOException {
         super(config, fullClassName, methodInfo);
@@ -143,6 +146,8 @@ public class SofiaHitsRunner extends MethodRunner {
 
         for (Map.Entry<String, Set<String>> entry : methodInfo.dependentMethods.entrySet()) {
             String depClassName = entry.getKey();
+
+            //Para los metodos que se encuentran dentro de la misma clase
             if (depClassName.equals(classInfo.getClassName())) {
                 Set<String> otherSig = methodInfo.dependentMethods.get(depClassName);
                 for (String otherMethod : otherSig) {
@@ -158,9 +163,36 @@ public class SofiaHitsRunner extends MethodRunner {
             }
 
             Set<String> depMethods = entry.getValue();
+            //System.out.println("generatePromptInfoWithDep: " + depClassName + " " + depMethods);
             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-            promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
+            SofiaHitsRunner.saveDepInfo(config, depClassName, promptInfo);
+
+            //EL EXTERNAL METHOD DEPS DE AQUI DEBE SUSTITUIR TAL Y COMO SE HACE EN LA EJECUCION PRIMERA
+            promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getHeaderDepInfo(config, depClassName, promptInfo));
+            //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
+
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
+        }
+        
+        int num_elements = (int) (embeddingClient.countElements() * 0.25);
+        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
+
+
+        for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
+            String key = entry.getKey();
+            List<MethodInfo> methods = entry.getValue();
+            System.out.println("///////////////// RAG /////////////////: ");
+
+            for (MethodInfo method : methods) {
+                System.out.print("Key: " + key + ", Method: " + method.getMethodName() + ", ");
+
+                //Si la cabecera no existe, no guardamos el metodo
+                if (!promptInfo.getExternalMethodDeps().containsKey(method.getClassName())) {
+                    continue;
+                }
+                promptInfo.addMethodsExternalMethodDeps(method.getClassName(), method.getSourceCode());
+            }
+            System.out.println("\n\n");
         }
 
         String fields = joinLines(classInfo.fields);
@@ -194,7 +226,58 @@ public class SofiaHitsRunner extends MethodRunner {
         promptInfo.setOtherMethodBrief(otherMethods);
         promptInfo.setOtherMethodBodies(otherFullMethods);
 
+        System.out.println("PROMPTINFO EXTERNAL METHODS " + promptInfo.getExternalMethodDeps().toString());
+        System.out.println("\n\n");
         return promptInfo;
+    }
+
+    /**
+     * Saves dependency information for a given class name by extracting and storing its methods.
+     * If the class information is already available, no action is taken.
+     *
+     * @param config       The configuration object containing necessary settings.
+     * @param depClassName The fully qualified name of the dependency class.
+     * @param promptInfo   Additional prompt information (not used in the current implementation).
+     * @return The source code of the dependency class if successfully retrieved and saved, 
+     *         or {@code null} if the class information is already available or an error occurs.
+     * @throws IOException If an I/O error occurs during the process.
+     */
+    public static String saveDepInfo(Config config, String depClassName, PromptInfo promptInfo) throws IOException {
+        ClassInfo depClassInfo = getClassInfo(config, depClassName);
+        if (depClassInfo == null) {
+            try {
+                String sourceCode = getSourceCode(depClassName);
+                if (sourceCode != null) {
+                    CodeParser.saveExtractedMethodsAndConstructors(depClassName, sourceCode);
+                }
+                return sourceCode;
+            } catch (Exception e) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+    }
+
+    public static String getHeaderDepInfo(Config config, String depClassName, PromptInfo promptInfo) throws IOException {
+        ClassInfo depClassInfo = getClassInfo(config, depClassName);
+        if (depClassInfo == null) {
+            try {
+                String sourceCode = getSourceCode(depClassName);
+                if (sourceCode != null) {
+                    promptInfo.incrementSofiaActivations();
+                }
+                //El sourceCode es la clase completa.
+                String classHeader = CodeParser.extractClassHeader(depClassName, sourceCode);
+                System.out.println("SofiaHITS HEADER: " + depClassName + " " + classHeader);
+
+                return classHeader;
+            } catch (Exception e) {
+                return null;
+            }
+        } else {
+            return null;
+        }
     }
 
     public static String getDepInfo(Config config, String depClassName, PromptInfo promptInfo) throws IOException {
@@ -205,6 +288,10 @@ public class SofiaHitsRunner extends MethodRunner {
                 if (sourceCode != null) {
                     promptInfo.incrementSofiaActivations();
                 }
+                System.out.println("SofiaHITS: " + depClassName + " " + sourceCode);
+                //El sourceCode es la clase completa.
+
+
                 return sourceCode;
             } catch (Exception e) {
                 return null;

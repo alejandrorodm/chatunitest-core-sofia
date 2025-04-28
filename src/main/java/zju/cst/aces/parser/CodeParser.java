@@ -150,7 +150,7 @@ public class CodeParser {
         return parts[parts.length - 1] + methodHeader.substring(parenIndex);
     }
 
-    public static void saveExtractedMethods(String depClassName, String sourceCode) {
+    public static void saveExtractedMethodsAndConstructors(String depClassName, String sourceCode) {
         List<String> methods = extractMethodsFromCode(depClassName, sourceCode);
         List<String> constructors = extractConstructorsFromCode(depClassName, sourceCode);
     
@@ -168,71 +168,208 @@ public class CodeParser {
             embeddingClient.saveCode(depClassName, methodName, constructorCode, signature, "", "", null);
         }
     }
+
+    /**
+     * Extrae la parte inicial de la clase: package, imports, declaración de clase
+     * y campos (variables) hasta el primer método o constructor.
+     */
+    public static String extractClassHeader(String depClassName, String sourceCode) {
+        String[] lines = sourceCode.split("\n");
+        StringBuilder header = new StringBuilder();
+        boolean inClass      = false;
+        int braceCount       = 0;
+
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+
+            // Siempre copiar package e imports
+            if (line.startsWith("package ") || line.startsWith("import ")) {
+                header.append(rawLine).append("\n");
+                continue;
+            }
+
+            // Detectar inicio de la clase
+            if (!inClass && (line.startsWith("public class " + depClassName)
+                        || line.startsWith("class " + depClassName)
+                        || line.contains(" class " + depClassName + " "))) {
+                inClass = true;
+                // Añadimos la línea de declaración de la clase
+                header.append(rawLine).append("\n");
+                // Cuenta las llaves de la declaración
+                if (line.contains("{")) {
+                    braceCount += countChar(line, '{') - countChar(line, '}');
+                }
+                continue;
+            }
+
+            // Una vez dentro de la clase (braceCount >= 1), copiamos todo hasta antes de métodos
+            if (inClass) {
+                // Actualiza conteo de llaves
+                if (line.contains("{") || line.contains("}")) {
+                    braceCount += countChar(line, '{') - countChar(line, '}');
+                }
+
+                // Detectar inicio de método o constructor: 
+                //   una firma que contenga "(" y "{" y no acabe en ";"
+                boolean isMethodOrCtor = line.contains("(")
+                                    && line.contains(")")
+                                    && line.contains("{");
+                if (isMethodOrCtor && braceCount>=2) {
+                    // hemos llegado al cuerpo del primer método/ctor
+                    break;
+                }
+
+                // Copiamos línea (campos, comentarios, anotaciones…)
+                header.append(rawLine).append("\n");
+            }
+        }
+
+        return header.toString();
+    }
+
+    private static int countChar(String s, char c) {
+        int count = 0;
+        for (char x : s.toCharArray()) if (x == c) count++;
+        return count;
+    }
     
 
     public static void main(String[] args) {
-        List<String> methods = extractMethodsFromCode("HTTP", "public class HttpEntity<T> {\r\n" + //
-                        "public static final HttpEntity<?> EMPTY = new HttpEntity();\r\n" + //
-                        "private final HttpHeaders headers;\r\n" + //
-                        "@Nullable\r\n" + //
-                        "private final T body;\r\n" + //
-                        "protected HttpEntity() {\r\n" + //
-                        "this(null, null);\r\n" + //
-                        "}\r\n" + //
-                        "public HttpEntity(T body) {\r\n" + //
-                        "this(body, null);\r\n" + //
-                        "}\r\n" + //
-                        "public HttpEntity(MultiValueMap<String, String> headers) {\r\n" + //
-                        "this(null, headers);\r\n" + //
-                        "}\r\n" + //
-                        "public HttpEntity(@Nullable T body, @Nullable MultiValueMap<String, String> headers) {\r\n" + //
-                        "this.body = body;\r\n" + //
-                        "HttpHeaders tempHeaders = new HttpHeaders();\r\n" + //
-                        "if (headers != null) {\r\n" + //
-                        "tempHeaders.putAll(headers);\r\n" + //
-                        "}\r\n" + //
-                        "this.headers = HttpHeaders.readOnlyHttpHeaders((HttpHeaders)tempHeaders);\r\n" + //
-                        "}\r\n" + //
-                        "public HttpHeaders getHeaders() {\r\n" + //
-                        "return this.headers;\r\n" + //
-                        "}\r\n" + //
-                        "@Nullable\r\n" + //
-                        "public T getBody() {\r\n" + //
-                        "return this.body;\r\n" + //
-                        "}\r\n" + //
-                        "public boolean hasBody() {\r\n" + //
-                        "return this.body != null;\r\n" + //
-                        "}\r\n" + //
-                        "public boolean equals(@Nullable Object other) {\r\n" + //
-                        "if (this == other) {\r\n" + //
-                        "return true;\r\n" + //
-                        "}\r\n" + //
-                        "if (other == null || other.getClass() != this.getClass()) {\r\n" + //
-                        "return false;\r\n" + //
-                        "}\r\n" + //
-                        "HttpEntity otherEntity = (HttpEntity)other;\r\n" + //
-                        "return ObjectUtils.nullSafeEquals((Object)this.headers, (Object)otherEntity.headers) && ObjectUtils.nullSafeEquals(this.body, otherEntity.body);\r\n" + //
-                        "}\r\n" + //
-                        "public int hashCode() {\r\n" + //
-                        "return ObjectUtils.nullSafeHashCode((Object)this.headers) * 29 + ObjectUtils.nullSafeHashCode(this.body);\r\n" + //
-                        "}\r\n" + //
-                        "public String toString() {\r\n" + //
-                        "StringBuilder builder = new StringBuilder(\"<\");\r\n" + //
-                        "if (this.body != null) {\r\n" + //
-                        "builder.append(this.body);\r\n" + //
-                        "builder.append(',');\r\n" + //
-                        "}\r\n" + //
-                        "builder.append(this.headers);\r\n" + //
-                        "builder.append('>');\r\n" + //
-                        "return builder.toString();\r\n" + //
-                        "}\r\n" + //
-                        "}\r\n" + //
-                        "");
-        for (String method : methods) {
-            System.out.println("Metodo:");
-            System.out.println(method);
-        }
+
+        String sourceCode = "package es.juntadeandalucia.ceceu.sede.libreriadto.gestionexpedientes;\r\n" + //
+                        "\r\n" + //
+                        "import es.juntadeandalucia.ceceu.sede.libreriadto.gestionexpedientes.DatabaseDTO;\r\n" + //
+                        "import javax.validation.constraints.NotNull;\r\n" + //
+                        "\r\n" + //
+                        "public class DocumentoDto\r\n" + //
+                        "extends DatabaseDTO {\r\n" + //
+                        "    @NotNull\r\n" + //
+                        "    private Character lgFirmado;\r\n" + //
+                        "    @NotNull\r\n" + //
+                        "    private String cdTipo;\r\n" + //
+                        "    private byte[] lbDocumento;\r\n" + //
+                        "    private Long idSolicitud;\r\n" + //
+                        "    private Long idConvocatoria;\r\n" + //
+                        "    private Long idProcedimiento;\r\n" + //
+                        "    private String dsNombre;\r\n" + //
+                        "    private String dsDescripcion;\r\n" + //
+                        "    private String tNombreArchivo;\r\n" + //
+                        "    private Long idExpTrewa;\r\n" + //
+                        "    private String cdTrnFirma;\r\n" + //
+                        "    private String cdNumRegistro;\r\n" + //
+                        "    private String cdDocumentoAlfresco;\r\n" + //
+                        "    private String txDniInteresado;\r\n" + //
+                        "    private Long idAnexoPresenta;\r\n" + //
+                        "    private Long nuOrden;\r\n" + //
+                        "    private String idTrnfirmaDoc;\r\n" + //
+                        "    private Long idFirmaPct;\r\n" + //
+                        "    private Long idPlantillasSolicitudesPdf;\r\n" + //
+                        "    private Long idDocTrewa;\r\n" + //
+                        "    private Long idDocTrewaCompulsa;\r\n" + //
+                        "    private String extensionFormato;\r\n" + //
+                        "    private Long tamnyoFichero;\r\n" + //
+                        "\r\n" + //
+                        "    public DocumentoDto(){\r\n" + //
+                        "        System.out.println('Hola');\r\n" + //
+                        "    }\r\n" + //
+                        "    public Character getLgFirmado() {\r\n" + //
+                        "        return this.lgFirmado;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public String getCdTipo() {\r\n" + //
+                        "        return this.cdTipo;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public byte[] getLbDocumento() {\r\n" + //
+                        "        return this.lbDocumento;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public Long getIdSolicitud() {\r\n" + //
+                        "        return this.idSolicitud;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public Long getIdConvocatoria() {\r\n" + //
+                        "        return this.idConvocatoria;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public Long getIdProcedimiento() {\r\n" + //
+                        "        return this.idProcedimiento;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "    public String getDsNombre() {\r\n" + //
+                        "        return this.dsNombre;\r\n" + //
+                        "    }\r\n" + //
+                        "\r\n" + //
+                        "";
+
+        String res = extractClassHeader("DocumentoDto", sourceCode);
+        String constructors = extractConstructorsFromCode("DocumentoDto", sourceCode).toString();
+        System.out.println(res);
+        System.out.println(constructors);
         System.out.println("===================================");
+        // List<String> methods = extractMethodsFromCode("HTTP", "public class HttpEntity<T> {\r\n" + //
+        //                 "public static final HttpEntity<?> EMPTY = new HttpEntity();\r\n" + //
+        //                 "private final HttpHeaders headers;\r\n" + //
+        //                 "@Nullable\r\n" + //
+        //                 "private final T body;\r\n" + //
+        //                 "protected HttpEntity() {\r\n" + //
+        //                 "this(null, null);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public HttpEntity(T body) {\r\n" + //
+        //                 "this(body, null);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public HttpEntity(MultiValueMap<String, String> headers) {\r\n" + //
+        //                 "this(null, headers);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public HttpEntity(@Nullable T body, @Nullable MultiValueMap<String, String> headers) {\r\n" + //
+        //                 "this.body = body;\r\n" + //
+        //                 "HttpHeaders tempHeaders = new HttpHeaders();\r\n" + //
+        //                 "if (headers != null) {\r\n" + //
+        //                 "tempHeaders.putAll(headers);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "this.headers = HttpHeaders.readOnlyHttpHeaders((HttpHeaders)tempHeaders);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public HttpHeaders getHeaders() {\r\n" + //
+        //                 "return this.headers;\r\n" + //
+        //                 "}\r\n" + //
+        //                 "@Nullable\r\n" + //
+        //                 "public T getBody() {\r\n" + //
+        //                 "return this.body;\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public boolean hasBody() {\r\n" + //
+        //                 "return this.body != null;\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public boolean equals(@Nullable Object other) {\r\n" + //
+        //                 "if (this == other) {\r\n" + //
+        //                 "return true;\r\n" + //
+        //                 "}\r\n" + //
+        //                 "if (other == null || other.getClass() != this.getClass()) {\r\n" + //
+        //                 "return false;\r\n" + //
+        //                 "}\r\n" + //
+        //                 "HttpEntity otherEntity = (HttpEntity)other;\r\n" + //
+        //                 "return ObjectUtils.nullSafeEquals((Object)this.headers, (Object)otherEntity.headers) && ObjectUtils.nullSafeEquals(this.body, otherEntity.body);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public int hashCode() {\r\n" + //
+        //                 "return ObjectUtils.nullSafeHashCode((Object)this.headers) * 29 + ObjectUtils.nullSafeHashCode(this.body);\r\n" + //
+        //                 "}\r\n" + //
+        //                 "public String toString() {\r\n" + //
+        //                 "StringBuilder builder = new StringBuilder(\"<\");\r\n" + //
+        //                 "if (this.body != null) {\r\n" + //
+        //                 "builder.append(this.body);\r\n" + //
+        //                 "builder.append(',');\r\n" + //
+        //                 "}\r\n" + //
+        //                 "builder.append(this.headers);\r\n" + //
+        //                 "builder.append('>');\r\n" + //
+        //                 "return builder.toString();\r\n" + //
+        //                 "}\r\n" + //
+        //                 "}\r\n" + //
+        //                 "");
+        // for (String method : methods) {
+        //     System.out.println("Metodo:");
+        //     System.out.println(method);
+        // }
+        // System.out.println("===================================");
+
     }
 
 }

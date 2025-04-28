@@ -96,6 +96,14 @@ public class PromptInfo {
         this.externalMethodDeps.put(depClassName, methodDep);
     }
 
+    public void addMethodsExternalMethodDeps(String depClassName, String methodDep) {
+        if (methodDep == null) {
+            return;
+        }
+        String actualmethodDep = externalMethodDeps.get(depClassName);
+        this.externalMethodDeps.put(depClassName, actualmethodDep + " " + methodDep);
+    }
+
     public void addExternalConstructorDeps(String depClassName, String constructorDep) {
         if (constructorDep == null) {
             return;
