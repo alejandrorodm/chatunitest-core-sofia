@@ -150,22 +150,24 @@ public class CodeParser {
         return parts[parts.length - 1] + methodHeader.substring(parenIndex);
     }
 
-    public static void saveExtractedMethodsAndConstructors(String depClassName, String sourceCode) {
+    public static void saveExtractedMethodsAndConstructors(String className, String depClassName, String sourceCode) {
         List<String> methods = extractMethodsFromCode(depClassName, sourceCode);
         List<String> constructors = extractConstructorsFromCode(depClassName, sourceCode);
-    
+        System.out.println("ClassName: " + className);
+        System.out.println("DepClassName: " + depClassName);
+        
         for (String methodCode : methods) {
             String firstLine = methodCode.split("\n")[0].trim();
             String signature = extractSignature(firstLine);
             String methodName = signature;
-            embeddingClient.saveCode(depClassName, methodName, methodCode, signature, "", "", null);
+            embeddingClient.saveCode(depClassName, methodName, methodCode, signature, "", "", null, className);
         }
     
         for (String constructorCode : constructors) {
             String firstLine = constructorCode.split("\n")[0].trim();
             String signature = extractSignature(firstLine);
             String methodName = depClassName;  // o className() + " constructor" para evitar ambigüedad
-            embeddingClient.saveCode(depClassName, methodName, constructorCode, signature, "", "", null);
+            embeddingClient.saveCode(depClassName, methodName, constructorCode, signature, "", "", null, className);
         }
     }
 

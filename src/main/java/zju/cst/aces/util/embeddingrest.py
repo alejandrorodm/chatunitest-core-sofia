@@ -60,11 +60,12 @@ def save_code():
         method_name = data.get('method_name')
         signature = data.get('signature')
         code = data.get('code')
-        print(f'Code to be saved: Class: {class_name}, Method: {method_name}, Signature: {signature}')
         
         comment = data.get('comment', '')
         annotations = data.get('annotations', '')
         dependent_methods = data.get('dependent_methods', [])
+        dependent_classes = data.get('dependent_classes', "")
+        print(f'Code to be saved: Class: {class_name}, Method: {method_name}, Signature: {signature}, Dependent classes: {dependent_classes}')
         
         if not class_name or not  method_name or not code:
             return jsonify({'error': 'Missing class name or code'}), 400
@@ -88,6 +89,7 @@ def save_code():
                     "comment": comment,
                     "annotations": annotations,
                     "dependent_methods": dependent_methods_str,
+                    "dependent_classes": dependent_classes,
                     "is_constructor": method_name == class_name  # Constructor check
                 }]
             )
@@ -156,29 +158,6 @@ def extract_method_name(code):
         return match.group(1)
     return None
 
-# def agrupar_vecinos_por_clase(results):
-#     vecinos_por_clase = {}
-
-#     metadatas = results["metadatas"][0]  # Lista de diccionarios, uno por resultado
-
-#     for metadata in metadatas:
-#         class_name = metadata["class_name"]
-#         is_constructor = metadata.get("is_constructor", False)
-
-#         if class_name not in vecinos_por_clase:
-#             vecinos_por_clase[class_name] = {
-#                 "constructor": None,
-#                 "methods": []
-#             }
-
-#         if is_constructor:
-#             vecinos_por_clase[class_name]["constructor"] = metadata["code"]
-#         else:
-#             vecinos_por_clase[class_name]["methods"].append(metadata["code"])
-
-#     return vecinos_por_clase
-
-
         
 @app.route('/search_similar_methods', methods=['POST'])
 def search_similar_methods():
@@ -240,6 +219,7 @@ def search_similar_methods():
                 "comment": meta.get("comment"),
                 "annotations": meta.get("annotations"),
                 "dependent_methods": meta.get("dependent_methods", []),
+                "dependent_classes": meta.get("dependent_classes", ""),
                 "similarity": round(similarity, 2),
                 "is_constructor": meta.get("is_constructor", False),
             })

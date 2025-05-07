@@ -165,7 +165,8 @@ public class SofiaHitsRunner extends MethodRunner {
             Set<String> depMethods = entry.getValue();
             //System.out.println("generatePromptInfoWithDep: " + depClassName + " " + depMethods);
             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-            SofiaHitsRunner.saveDepInfo(config, depClassName, promptInfo);
+            System.out.println("NOMBRE DE LA CLASE " + classInfo.className);
+            SofiaHitsRunner.saveDepInfo(config, classInfo.className, depClassName, promptInfo);
 
             //EL EXTERNAL METHOD DEPS DE AQUI DEBE SUSTITUIR TAL Y COMO SE HACE EN LA EJECUCION PRIMERA
             promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getHeaderDepInfo(config, depClassName, promptInfo));
@@ -175,25 +176,31 @@ public class SofiaHitsRunner extends MethodRunner {
         }
         
         int num_elements = (int) (embeddingClient.countElements() * 0.25);
-        Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
+
+        if(num_elements > 0){
+            Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
 
 
-        for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
-            String key = entry.getKey();
-            List<MethodInfo> methods = entry.getValue();
-            System.out.println("///////////////// RAG /////////////////: ");
+            for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
+                String key = entry.getKey();
+                List<MethodInfo> methods = entry.getValue();
+                System.out.println("///////////////// RAG /////////////////: ");
 
-            for (MethodInfo method : methods) {
-                System.out.print("Key: " + key + ", Method: " + method.getMethodName() + ", ");
+                for (MethodInfo method : methods) {
+                    System.out.print("Key: " + key + ", Method: " + method.getMethodName() + ", ");
 
-                //Si la cabecera no existe, no guardamos el metodo
-                if (!promptInfo.getExternalMethodDeps().containsKey(method.getClassName())) {
-                    continue;
+                    //Si la cabecera no existe, no guardamos el metodo
+                    if (!promptInfo.getExternalMethodDeps().containsKey(method.getClassName())) {
+                        continue;
+                    }
+                    promptInfo.addMethodsExternalMethodDeps(method.getClassName(), method.getSourceCode());
                 }
-                promptInfo.addMethodsExternalMethodDeps(method.getClassName(), method.getSourceCode());
+                System.out.println("\n\n");
             }
-            System.out.println("\n\n");
+        }else{
+            System.out.println("Se han seleccionado 0 elementos como petición para el RAG.\n\n");
         }
+
 
         String fields = joinLines(classInfo.fields);
         String imports = joinLines(classInfo.imports);
@@ -242,13 +249,13 @@ public class SofiaHitsRunner extends MethodRunner {
      *         or {@code null} if the class information is already available or an error occurs.
      * @throws IOException If an I/O error occurs during the process.
      */
-    public static String saveDepInfo(Config config, String depClassName, PromptInfo promptInfo) throws IOException {
+    public static String saveDepInfo(Config config, String className, String depClassName, PromptInfo promptInfo) throws IOException {
         ClassInfo depClassInfo = getClassInfo(config, depClassName);
         if (depClassInfo == null) {
             try {
                 String sourceCode = getSourceCode(depClassName);
                 if (sourceCode != null) {
-                    CodeParser.saveExtractedMethodsAndConstructors(depClassName, sourceCode);
+                    CodeParser.saveExtractedMethodsAndConstructors(className, depClassName, sourceCode);
                 }
                 return sourceCode;
             } catch (Exception e) {

@@ -133,7 +133,7 @@ public class EmbeddingClient {
             }
         }
 
-    public JSONObject saveCode(String className, String methodName, String code, String signature, String comment, String annotations, List<String> dependentMethods) {
+    public JSONObject saveCode(String className, String methodName, String code, String signature, String comment, String annotations, List<String> dependentMethods, String dependentClasses) {
         JSONObject inputJson = new JSONObject();
         inputJson.put("class_name", className);
         inputJson.put("method_name", methodName);
@@ -142,6 +142,7 @@ public class EmbeddingClient {
         inputJson.put("comment", comment);
         inputJson.put("annotations", annotations);
         inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
+        inputJson.put("dependent_classes", dependentClasses); // Añadir dependencias de clases
         inputJson.put("is_constructor", methodName.equals(className)); // true si es constructor, false si no
         //System.out.println("Code to be saved: " + signature);
         String response = sendPostRequest("save_code", inputJson.toString());

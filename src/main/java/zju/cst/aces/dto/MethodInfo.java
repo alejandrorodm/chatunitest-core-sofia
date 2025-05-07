@@ -25,6 +25,7 @@ public class MethodInfo {
     public String method_comment;
     public String method_annotation;
     public String methodDescriptor;
+    public String dependent_classes;
 
     public MethodInfo(String className, String methodName, String brief, String methodSignature,
                       String sourceCode, List<String> parameters, Map<String, Set<String>> dependentMethods,String full_method_info,String method_comment,String method_annotation, String methodDescriptor){
@@ -41,5 +42,20 @@ public class MethodInfo {
         this.methodDescriptor=methodDescriptor;
     }
 
+    public MethodInfo(String className, String methodName, String brief, String methodSignature,
+                      String sourceCode, List<String> parameters, Map<String, Set<String>> dependentMethods,String full_method_info,String method_comment,String method_annotation, String methodDescriptor, String dependent_classes){
+        this.className = className;
+        this.methodName = methodName;
+        this.brief = brief;
+        this.methodSignature = methodSignature;
+        this.sourceCode = sourceCode;
+        this.parameters = parameters;
+        this.dependentMethods = dependentMethods;
+        this.full_method_info=full_method_info;
+        this.method_comment=method_comment;
+        this.method_annotation=method_annotation;
+        this.methodDescriptor=methodDescriptor;
+        this.dependent_classes = dependent_classes;
+    }
 
 }
