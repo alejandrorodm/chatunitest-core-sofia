@@ -206,11 +206,14 @@ public class EmbeddingClient {
         return results;
     }
 
-    public Map<String, List<MethodInfo>> search_similar_methods(String code, int limit) {
+    public Map<String, List<MethodInfo>> search_similar_methods(String code, int limit, String classNameToTest) {
         String inputJson = new JSONObject()
                 .put("code", code)
                 .put("max_neighbours", limit)
+                .put("classNameToTest", classNameToTest) // Añadir el nombre de la clase
                 .toString();
+
+        //AQUI SE DEBE ARREGLAR EL REST API PARA QUE COMPRUEBE QUE ES DE DICHA CLASE LA DEPENDENCIA
     
         String response = sendPostRequest("search_similar_methods", inputJson);
         Map<String, List<MethodInfo>> methodsByClass = new HashMap<>();
@@ -239,7 +242,8 @@ public class EmbeddingClient {
                             "",  // `full_method_info`
                             result.optString("comment", ""),
                             result.optString("annotations", ""),
-                            response
+                            response,
+                            result.optString("dependent_classes", "") // `dependent_classes`
                     );
     
                     // Añadir al mapa por clase

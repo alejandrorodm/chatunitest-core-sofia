@@ -165,7 +165,6 @@ public class SofiaHitsRunner extends MethodRunner {
             Set<String> depMethods = entry.getValue();
             //System.out.println("generatePromptInfoWithDep: " + depClassName + " " + depMethods);
             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
-            System.out.println("NOMBRE DE LA CLASE " + classInfo.className);
             SofiaHitsRunner.saveDepInfo(config, classInfo.className, depClassName, promptInfo);
 
             //EL EXTERNAL METHOD DEPS DE AQUI DEBE SUSTITUIR TAL Y COMO SE HACE EN LA EJECUCION PRIMERA
@@ -175,10 +174,11 @@ public class SofiaHitsRunner extends MethodRunner {
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
         }
         
-        int num_elements = (int) (embeddingClient.countElements() * 0.25);
+        int num_elements = (int) (embeddingClient.countElements() * config.getRagPercent());
+        System.out.println("RAG Percent " + config.getRagPercent() + " num_elements " + num_elements);
 
         if(num_elements > 0){
-            Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements);
+            Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements, classInfo.className);
 
 
             for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
@@ -276,7 +276,7 @@ public class SofiaHitsRunner extends MethodRunner {
                 }
                 //El sourceCode es la clase completa.
                 String classHeader = CodeParser.extractClassHeader(depClassName, sourceCode);
-                System.out.println("SofiaHITS HEADER: " + depClassName + " " + classHeader);
+                //System.out.println("SofiaHITS HEADER: " + depClassName + " " + classHeader);
 
                 return classHeader;
             } catch (Exception e) {
