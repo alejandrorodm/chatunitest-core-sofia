@@ -27,50 +27,47 @@ public class processNameForHITS {
 
         if (files != null && files.length > 0) {
             for (File file : files) {
-            // 只处理 .java 文件
-            if (file.isFile() && file.getName().endsWith(".java")) {
-                Matcher matcher = filePattern.matcher(file.getName());
-                Matcher suiteMatcher = suitePattern.matcher(file.getName());
+                // 只处理 .java 文件
 
-                if (suiteMatcher.matches()) {
-                String baseName = suiteMatcher.group(1);
+                if (file.isFile() && file.getName().endsWith(".java")) {
+                    Matcher matcher = filePattern.matcher(file.getName());
+                    Matcher suiteMatcher = suitePattern.matcher(file.getName());
 
-                // Read the file content and replace class names
-                try {
-                    String content = new String(Files.readAllBytes(file.toPath()));
-
-                    // Replace all occurrences of Test with slice and slice with Test
-                    // This handles the classes that are referenced in @SelectClasses
-
-                    // Replace all occurrences of _Test_slice with _slice_Test
-                    content = content.replaceAll("("+classToProcess+"_.*?)(_Test)(_slice\\d+)", "$1$3_Test");
-
-                    // Write the updated content back to the file
-                    Files.write(file.toPath(), content.getBytes());
-                    System.out.println("Updated content in: " + file.getName());
-                } catch (IOException e) {
-                    System.err.println("Error processing file: " + file.getName());
-                    e.printStackTrace();
-                }
-                }
+                    if (suiteMatcher.matches()) {
+                        if (file.delete()) {
+                            System.out.println("Deleted file: " + file.getName());
+                        } else {
+                            System.out.println("Failed to delete file: " + file.getName());
+                        }
+                    
+                    }
 
                     if (matcher.matches()) {
                         String xxx = matcher.group(1);
                         String n = matcher.group(2);
-                        String newClassName = xxx + "_slice" + n + "_Test";
                         String newFileName = xxx + "_slice" + n + "_Test.java";
 
                         // 读取文件内容并替换类名
                         try {
                             String content = new String(Files.readAllBytes(file.toPath()));
-                            content = content.replaceAll("class " + Pattern.quote(xxx + "_Test"), "class " + newClassName);
 
-                            //REVISAR COMO ERA EL LOGGER PARA PODER CORREGIRLO
+                            // Nombre viejo y nuevo
+                            String oldClassName = xxx + "_Test";
+                            String newClassName   = xxx + "_slice" + n + "_Test";
 
-                            // 写入新的文件内容
+                            // 1) Sustituimos la declaración de la clase
+                            content = content.replaceAll(
+                                "\\bclass\\s+" + Pattern.quote(oldClassName) + "\\b",
+                                "class " + newClassName
+                            );
+
+                            // 2) Sustituimos todas las demás referencias al nombre de la clase
+                            content = content.replaceAll(
+                                "\\b" + Pattern.quote(oldClassName) + "\\b",
+                                Matcher.quoteReplacement(newClassName)
+                            );
                             Files.write(file.toPath(), content.getBytes());
 
-                            // 重命名文件
                             File newFile = new File(folderPath, newFileName);
                             if (file.renameTo(newFile)) {
                                 System.out.println("Renamed: " + file.getName() + " to " + newFileName);
