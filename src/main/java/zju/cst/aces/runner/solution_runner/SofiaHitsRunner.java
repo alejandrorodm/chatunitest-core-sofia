@@ -31,7 +31,6 @@ public class SofiaHitsRunner extends MethodRunner {
     public SofiaHitsRunner(Config config, String fullClassName, MethodInfo methodInfo) throws IOException {
         super(config, fullClassName, methodInfo);
         dependencies = new ArrayList<>(config.getDependencyPaths());
-
         logger = config.getLogger();
     }
 
@@ -173,9 +172,10 @@ public class SofiaHitsRunner extends MethodRunner {
 
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
         }
-        
-        int num_elements = (int) (embeddingClient.countElements() * config.getRagPercent());
-        System.out.println("RAG Percent " + config.getRagPercent() + " num_elements " + num_elements);
+        System.out.println("CONFIG RAG PERCENT " + config.getRagPercent());
+        double ragPercent = config.getRagPercent() / 100.0;
+        int num_elements = (int) (embeddingClient.countElements() * ragPercent);
+        System.out.println("Elementos totales BD: " + embeddingClient.countElements() + " RAG Percent " + ragPercent + " num_elements " + num_elements);
 
         if(num_elements > 0){
             Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements, classInfo.className);

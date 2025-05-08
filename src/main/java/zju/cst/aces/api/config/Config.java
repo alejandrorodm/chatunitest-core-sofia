@@ -63,7 +63,7 @@ public class Config {
     public int methodThreads;
     public int testNumber;
     public int maxRounds;
-    public double ragPercent;
+    public int ragPercent;
     public int maxPromptTokens;
     public int maxResponseTokens;
     public int minErrorTokens;
@@ -131,7 +131,7 @@ public class Config {
         public int methodThreads = (int) Math.ceil((double) this.maxThreads / this.classThreads);
         public int testNumber = 5;
         public int maxRounds = 5;
-        public double ragPercent = 0.5;
+        public int ragPercent = 50;
         public int maxPromptTokens = 2600;
         public int maxResponseTokens = 1024;
         public int minErrorTokens = 500;
@@ -409,6 +409,11 @@ public class Config {
 
         public ConfigBuilder maxRounds(int maxRounds) {
             this.maxRounds = maxRounds;
+            return this;
+        }
+
+        public ConfigBuilder ragPercent(int ragPercent) {
+            this.ragPercent = ragPercent;
             return this;
         }
 
@@ -704,7 +709,7 @@ public class Config {
         logger.info(" MaxThreads >>> " + this.getMaxThreads());
         logger.info(" TestNumber >>> " + this.getTestNumber());
         logger.info(" MaxRounds >>> " + this.getMaxRounds());
-        logger.info(" RAGPercent >>> " + this.getRagPercent());
+        logger.info(" RagPercent >>> " + this.getRagPercent());
         logger.info(" MinErrorTokens >>> " + this.getMinErrorTokens());
         logger.info(" MaxPromptTokens >>> " + this.getMaxPromptTokens());
         logger.info(" SleepTime >>> " + this.getSleepTime());
