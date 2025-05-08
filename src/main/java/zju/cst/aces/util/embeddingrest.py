@@ -86,9 +86,9 @@ def save_code():
                     "method_name": method_name,
                     "signature": signature,
                     "code": code,
-                    "comment": comment,
-                    "annotations": annotations,
-                    "dependent_methods": dependent_methods_str,
+                    #"comment": comment,
+                    #"annotations": annotations,
+                    #"dependent_methods": dependent_methods_str,
                     "dependent_classes": dependent_classes,
                     "is_constructor": method_name == class_name  # Constructor check
                 }]
@@ -164,6 +164,7 @@ def search_similar_methods():
     try:
         data = request.json
         #print(f"Data received: {data}")
+        test_class_name = data.get('test_class_name', '')
         class_name = data.get('class_name', '')
         method_name = data.get('method_name', '')
         code = data.get('code')
@@ -190,17 +191,29 @@ def search_similar_methods():
         query_embedding = generate_embedding(code)
 
         # Búsqueda en la base de datos
-        try:
-            results = collection.query(
-                query_embeddings=[query_embedding],
-                n_results=max_neighbours,  
-                include=["metadatas", "embeddings"]
-            )
-                        
-        except Exception as e:
-            print(f"Error retrieving similar methods: {e}")
-            return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
-
+        if test_class_name:
+            try:
+                results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=max_neighbours,  
+                    include=["metadatas", "embeddings"],
+                    where={"dependent_classes": {"$in": [test_class_name]}}
+                )                  
+            except Exception as e:
+                print(f"Error retrieving similar methods: {e}")
+                return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
+        else:
+            try:
+                results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=max_neighbours,  
+                    include=["metadatas", "embeddings"],
+                )
+            except Exception as e:
+                print(f"Error retrieving similar methods: {e}")
+                return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
+            
+            
         matched_results = []
         for meta, neighbor_embedding in zip(results["metadatas"][0], results["embeddings"][0]):
             similarity = cosine_similarity(query_embedding, neighbor_embedding)

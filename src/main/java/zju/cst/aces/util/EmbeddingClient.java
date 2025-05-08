@@ -1,9 +1,9 @@
 package zju.cst.aces.util;
 
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -12,9 +12,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.IOException;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import zju.cst.aces.dto.MethodInfo;
 
 
@@ -141,9 +142,11 @@ public class EmbeddingClient {
         inputJson.put("signature", signature);
         inputJson.put("comment", comment);
         inputJson.put("annotations", annotations);
-        inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
+        //inputJson.put("dependent_methods", new JSONArray(dependentMethods)); 
         inputJson.put("dependent_classes", dependentClasses); // Añadir dependencias de clases
-        inputJson.put("is_constructor", methodName.equals(className)); // true si es constructor, false si no
+        String baseMethodName = methodName.split("\\(")[0].trim();
+        inputJson.put("is_constructor", baseMethodName.equals(className.trim())); // Verificar si es un constructor
+        
         //System.out.println("Code to be saved: " + signature);
         String response = sendPostRequest("save_code", inputJson.toString());
 
@@ -196,9 +199,10 @@ public class EmbeddingClient {
                     methodData.put("method_name", result.optString("method_name", ""));
                     methodData.put("signature", result.optString("signature", ""));
                     methodData.put("code", result.optString("code", ""));
-                    methodData.put("comment", result.optString("comment", ""));
-                    methodData.put("annotations", result.optString("annotations", ""));
-                    methodData.put("dependent_methods", result.optString("dependent_methods", "")); //METODOS MISMA CLASE
+                    //methodData.put("comment", result.optString("comment", ""));
+                    //methodData.put("annotations", result.optString("annotations", ""));
+                    //methodData.put("dependent_methods", result.optString("dependent_methods", "")); //METODOS MISMA CLASE
+                    methodData.put("dependent_classes", result.optString("dependent_classes", "")); // CLASES DEPENDIENTES
                     results.add(methodData);
                 }
             }
@@ -206,11 +210,11 @@ public class EmbeddingClient {
         return results;
     }
 
-    public Map<String, List<MethodInfo>> search_similar_methods(String code, int limit, String classNameToTest) {
+    public Map<String, List<MethodInfo>> search_similar_methods(String code, int limit, String test_class_name) {
         String inputJson = new JSONObject()
                 .put("code", code)
                 .put("max_neighbours", limit)
-                .put("classNameToTest", classNameToTest) // Añadir el nombre de la clase
+                .put("test_class_name", test_class_name) // Añadir el nombre de la clase
                 .toString();
 
         //AQUI SE DEBE ARREGLAR EL REST API PARA QUE COMPRUEBE QUE ES DE DICHA CLASE LA DEPENDENCIA
@@ -240,8 +244,8 @@ public class EmbeddingClient {
                             null,  // `parameters`
                             dependentMethods,
                             "",  // `full_method_info`
-                            result.optString("comment", ""),
-                            result.optString("annotations", ""),
+                            //result.optString("comment", ""),
+                            //result.optString("annotations", ""),
                             response,
                             result.optString("dependent_classes", "") // `dependent_classes`
                     );
