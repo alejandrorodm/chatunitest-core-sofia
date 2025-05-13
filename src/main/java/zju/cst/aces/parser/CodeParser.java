@@ -150,7 +150,7 @@ public class CodeParser {
         return parts[parts.length - 1] + methodHeader.substring(parenIndex);
     }
 
-    public static void saveExtractedMethodsAndConstructors(String className, String depClassName, String sourceCode) {
+    public static int saveExtractedMethodsAndConstructors(String className, String depClassName, String sourceCode) {
         List<String> methods = extractMethodsFromCode(depClassName, sourceCode);
         List<String> constructors = extractConstructorsFromCode(depClassName, sourceCode);
         System.out.println("ClassName: " + className);
@@ -169,6 +169,8 @@ public class CodeParser {
             String methodName = depClassName;  // o className() + " constructor" para evitar ambigüedad
             embeddingClient.saveCode(depClassName, methodName, constructorCode, signature, "", "", null, className);
         }
+
+        return 0;
     }
 
     /**

@@ -32,8 +32,8 @@ def check_if_id_exists(unique_id):
             
         # Comprobar si existe en la respuesta
         if existing and ids:
-            print(existing)
-            print(f"Existing IDs: {ids}")
+            #print(existing)
+            #print(f"Existing IDs: {ids}")
             return True # El ID ya existe, no se debe insertar
         else:
             return False  # El ID no existe, se puede insertar
@@ -94,9 +94,7 @@ def save_code():
                 }]
             )
             return jsonify({'message': 'Code saved successfully'})
-        else:
-            print(f"ID {unique_id} ya existe. Se omite.")
-            
+        else:            
             # Actualizar el registro existente añadiendo el nuevo dependent_classes
             try:
                 existing = collection.get(ids=[unique_id])
@@ -284,17 +282,20 @@ def search_similar_methods():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/count_elements', methods=['GET'])
+@app.route('/count_elements', methods=['POST'])
 def count_elements():
     try:
-        try:
-            dependent_class = request.args.get('dependent_class', '')
-        except Exception as e:
+        data = request.json
+        dependent_class = data.get('dependent_class', None)
+
+        if dependent_class is None :
             print("No se ha añadido clase dependiente, buscando elementos de la base de datos")
             results = collection.get(include=["metadatas"])
         else:
+            print(f"Buscando elementos de la base de datos con clase dependiente {dependent_class}")
             results = collection.get(include=["metadatas"], where={"dependent_classes": {"$in": [dependent_class]}})
             
+        print(f"Total elements found: {len(results['metadatas'])}")
         total_elements = len(results["metadatas"])
         return jsonify({'total_elements': total_elements})
     
@@ -303,5 +304,5 @@ def count_elements():
 
 if __name__ == '__main__':
     print("Server is starting on http://127.0.0.1:5000")
-    serve(app=app, host='127.0.0.1', port=5000, threads=10)
+    serve(app=app, host='127.0.0.1', port=5000, threads=20)
 

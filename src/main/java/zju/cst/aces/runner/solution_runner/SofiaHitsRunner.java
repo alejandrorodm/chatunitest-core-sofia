@@ -176,7 +176,7 @@ public class SofiaHitsRunner extends MethodRunner {
             System.out.println("CONFIG RAG PERCENT " + config.getRagPercent());
             double ragPercent = config.getRagPercent() / 100.0;
             int num_elements = (int) (embeddingClient.countElements(classInfo.className) * ragPercent);
-            System.out.println("Elementos totales BD: " + embeddingClient.countElements() + " RAG Percent " + ragPercent + " num_elements " + num_elements);
+            System.out.println("RAG Percent " + ragPercent + " num_elements " + num_elements);
 
             if(num_elements > 0){
                 Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements, classInfo.className);
