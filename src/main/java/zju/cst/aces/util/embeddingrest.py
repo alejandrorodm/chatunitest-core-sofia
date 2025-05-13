@@ -73,7 +73,11 @@ def save_code():
         # Verificar si ya existe
         unique_id = class_name + '-' + signature  # Define unique_id
         
-        is_constructor = method_name == class_name  # Constructor check
+        # Limpiar method_name: quitar espacios y quedarse con la parte antes de '('
+        if method_name:
+            method_name = method_name.split('(')[0].strip()
+            
+        is_constructor = method_name == class_name.strip()  # Constructor check
         
         if not check_if_id_exists(unique_id):
             print(f'Code to be saved: Class {class_name}, Signature: {signature}, Dep_classes: {dependent_classes}')
@@ -108,7 +112,7 @@ def save_code():
                     elif not isinstance(prev_dependent_classes, str):
                         prev_dependent_classes = str(prev_dependent_classes)
                         
-                    new_dependent_classes = str(prev_dependent_classes) + "," + str(dependent_classes)
+                    new_dependent_classes = prev_dependent_classes.strip() + "," + str(dependent_classes).strip()
                     
                     # Actualizar el registro en la colección
                     collection.update(
@@ -293,7 +297,8 @@ def count_elements():
             results = collection.get(include=["metadatas"])
         else:
             print(f"Buscando elementos de la base de datos con clase dependiente {dependent_class}")
-            results = collection.get(include=["metadatas"], where={"dependent_classes": {"$in": [dependent_class]}})
+            
+            results = collection.get(include=["metadatas"], where={"dependent_classes": {"$in": [dependent_class.strip()]}})
             
         print(f"Total elements found: {len(results['metadatas'])}")
         total_elements = len(results["metadatas"])
