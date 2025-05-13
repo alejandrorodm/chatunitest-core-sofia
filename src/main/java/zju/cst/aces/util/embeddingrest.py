@@ -29,15 +29,13 @@ def check_if_id_exists(unique_id):
         # Buscar si el ID ya existe
         existing = collection.get(ids=[unique_id])
         ids = existing.get('ids', [])
-        
+            
         # Comprobar si existe en la respuesta
         if existing and ids:
-            #print(f"(CHECK_ID) ID {unique_id} ya existe. Se omite.")
+            print(existing)
+            print(f"Existing IDs: {ids}")
             return True # El ID ya existe, no se debe insertar
         else:
-            #print(f"(CHECK_ID) ID {unique_id} no existe. Se puede insertar.")
-            #print(existing)
-            #print(f"Existing IDs: {ids}")
             return False  # El ID no existe, se puede insertar
 
     except Exception as e:
@@ -65,7 +63,6 @@ def save_code():
         annotations = data.get('annotations', '')
         dependent_methods = data.get('dependent_methods', [])
         dependent_classes = data.get('dependent_classes', "")
-        print(f'Code to be saved: Class: {class_name}, Method: {method_name}, Signature: {signature}, Dependent classes: {dependent_classes}')
         
         if not class_name or not  method_name or not code:
             return jsonify({'error': 'Missing class name or code'}), 400
@@ -76,7 +73,10 @@ def save_code():
         # Verificar si ya existe
         unique_id = class_name + '-' + signature  # Define unique_id
         
+        is_constructor = method_name == class_name  # Constructor check
+        
         if not check_if_id_exists(unique_id):
+            print(f'Code to be saved: Class {class_name}, Signature: {signature}, Dep_classes: {dependent_classes}')
             embeddings = generate_embedding(code)
             collection.add(
                 ids=[unique_id],
@@ -89,11 +89,43 @@ def save_code():
                     #"comment": comment,
                     #"annotations": annotations,
                     #"dependent_methods": dependent_methods_str,
-                    "dependent_classes": dependent_classes,
-                    "is_constructor": method_name == class_name  # Constructor check
+                    "dependent_classes": str(dependent_classes),
+                    "is_constructor": str(is_constructor)  # Constructor check
                 }]
             )
-        return jsonify({'message': 'Code saved successfully'})
+            return jsonify({'message': 'Code saved successfully'})
+        else:
+            print(f"ID {unique_id} ya existe. Se omite.")
+            
+            # Actualizar el registro existente añadiendo el nuevo dependent_classes
+            try:
+                existing = collection.get(ids=[unique_id])
+                if existing and len(existing.get('ids', [])) > 0:
+                    # Obtener el valor anterior de dependent_classes
+                    prev_dependent_classes = existing['metadatas'][0].get('dependent_classes', "")
+                    
+                    # Forzar que prev_dependent_classes sea string
+                    if isinstance(prev_dependent_classes, list):
+                        prev_dependent_classes = ",".join([str(c) for c in prev_dependent_classes])
+                    elif not isinstance(prev_dependent_classes, str):
+                        prev_dependent_classes = str(prev_dependent_classes)
+                        
+                    new_dependent_classes = str(prev_dependent_classes) + "," + str(dependent_classes)
+                    
+                    # Actualizar el registro en la colección
+                    collection.update(
+                        ids=[unique_id],
+                        metadatas=[{
+                            **existing['metadatas'][0],
+                            "dependent_classes": new_dependent_classes
+                        }]
+                    )
+                print(f"ID {unique_id} actualizado con dependent_classes: {new_dependent_classes}")
+            except Exception as e:
+                print(f"Error actualizando dependent_classes para ID {unique_id}: {e}")
+                return jsonify({'error': 'Error updating dependent_classes'}), 500
+            else:
+                return jsonify({'message': 'ID already exists, but updated dependent_classes'}), 200
     except Exception as e:
         print(f"Error saving code: {e}")
         return jsonify({'error': str(e)}), 500
@@ -255,14 +287,21 @@ def search_similar_methods():
 @app.route('/count_elements', methods=['GET'])
 def count_elements():
     try:
-        results = collection.get(include=["metadatas"])
+        try:
+            dependent_class = request.args.get('dependent_class', '')
+        except Exception as e:
+            print("No se ha añadido clase dependiente, buscando elementos de la base de datos")
+            results = collection.get(include=["metadatas"])
+        else:
+            results = collection.get(include=["metadatas"], where={"dependent_classes": {"$in": [dependent_class]}})
+            
         total_elements = len(results["metadatas"])
         return jsonify({'total_elements': total_elements})
+    
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 if __name__ == '__main__':
     print("Server is starting on http://127.0.0.1:5000")
-    serve(app=app, host='127.0.0.1', port=5000)
+    serve(app=app, host='127.0.0.1', port=5000, threads=10)
 

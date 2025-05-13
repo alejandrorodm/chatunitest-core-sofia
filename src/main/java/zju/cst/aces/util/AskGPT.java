@@ -53,8 +53,10 @@ public class AskGPT {
                 do {
                     response = config.getClient().newCall(request).execute();
                     if (response.code() == 429) {
-                        config.getLogger().info("Waiting 2 hours...");
-                        Thread.sleep(3600 * 2 * 1000);
+                        //config.getLogger().info("Waiting 2 hours...");
+                        //Thread.sleep(3600 * 2 * 1000);
+                        config.getLogger().info("Waiting 5 minutes...");
+                        Thread.sleep(5 * 60 * 1000);
                     }
                 } while (response.code() == 429);
 

@@ -162,43 +162,47 @@ public class SofiaHitsRunner extends MethodRunner {
             }
 
             Set<String> depMethods = entry.getValue();
-            //System.out.println("generatePromptInfoWithDep: " + depClassName + " " + depMethods);
             promptInfo.addMethodDeps(depClassName, getDepInfo(config, depClassName, depMethods));
             SofiaHitsRunner.saveDepInfo(config, classInfo.className, depClassName, promptInfo);
 
-            //EL EXTERNAL METHOD DEPS DE AQUI DEBE SUSTITUIR TAL Y COMO SE HACE EN LA EJECUCION PRIMERA
             promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getHeaderDepInfo(config, depClassName, promptInfo));
-            //promptInfo.addExternalMethodDeps(depClassName, SofiaHitsRunner.getDepInfo(config, depClassName, promptInfo));
 
             addMethodDepsByDepth(config, depClassName, depMethods, promptInfo, config.getDependencyDepth());
         }
-        System.out.println("CONFIG RAG PERCENT " + config.getRagPercent());
-        double ragPercent = config.getRagPercent() / 100.0;
-        int num_elements = (int) (embeddingClient.countElements() * ragPercent);
-        System.out.println("Elementos totales BD: " + embeddingClient.countElements() + " RAG Percent " + ragPercent + " num_elements " + num_elements);
 
-        if(num_elements > 0){
-            Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements, classInfo.className);
+        // Si encontramos dependencias externas, buscamos los metodos similares
+        // y los guardamos en el promptInfo
+        if (promptInfo.sofiaActivations > 0) {
+            System.out.println("CONFIG RAG PERCENT " + config.getRagPercent());
+            double ragPercent = config.getRagPercent() / 100.0;
+            int num_elements = (int) (embeddingClient.countElements(classInfo.className) * ragPercent);
+            System.out.println("Elementos totales BD: " + embeddingClient.countElements() + " RAG Percent " + ragPercent + " num_elements " + num_elements);
+
+            if(num_elements > 0){
+                Map<String, List<MethodInfo>> rag_results = embeddingClient.search_similar_methods(methodInfo.getSourceCode(), num_elements, classInfo.className);
 
 
-            for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
-                String key = entry.getKey();
-                List<MethodInfo> methods = entry.getValue();
-                System.out.println("///////////////// RAG /////////////////: ");
+                for (Map.Entry<String, List<MethodInfo>> entry : rag_results.entrySet()) {
+                    String key = entry.getKey();
+                    List<MethodInfo> methods = entry.getValue();
+                    System.out.println("///////////////// RAG /////////////////: ");
 
-                for (MethodInfo method : methods) {
-                    System.out.print("Key: " + key + ", Method: " + method.getMethodName() + ", ");
+                    for (MethodInfo method : methods) {
+                        System.out.print("Key: " + key + ", Method: " + method.getMethodName() + ", ");
 
-                    //Si la cabecera no existe, no guardamos el metodo
-                    if (!promptInfo.getExternalMethodDeps().containsKey(method.getClassName())) {
-                        continue;
+                        //Si la cabecera no existe, no guardamos el metodo
+                        if (!promptInfo.getExternalMethodDeps().containsKey(method.getClassName())) {
+                            continue;
+                        }
+                        promptInfo.addMethodsExternalMethodDeps(method.getClassName(), method.getSourceCode());
                     }
-                    promptInfo.addMethodsExternalMethodDeps(method.getClassName(), method.getSourceCode());
+                    System.out.println("\n\n");
                 }
-                System.out.println("\n\n");
+            }else{
+                System.out.println("Se han seleccionado 0 elementos como petición para el RAG.\n\n");
             }
-        }else{
-            System.out.println("Se han seleccionado 0 elementos como petición para el RAG.\n\n");
+        } else {
+            System.out.println("No hay dependencias externas para la clase.\n\n");
         }
 
 

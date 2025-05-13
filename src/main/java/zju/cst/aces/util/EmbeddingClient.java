@@ -261,6 +261,23 @@ public class EmbeddingClient {
         return methodsByClass;
     }    
 
+    public int countElements(String className) {
+        String inputJson = new JSONObject()
+                .put("dependent_class", className)
+                .toString();
+        String response = sendPostRequest("count_elements", inputJson);
+        
+        if (response != null) {
+            JSONObject jsonResponse = new JSONObject(response);
+            if (jsonResponse.has("total_elements")) {
+                return jsonResponse.getInt("total_elements");
+            } else if (jsonResponse.has("error")) {
+                System.err.println("Error al contar elementos: " + jsonResponse.getString("error"));
+            }
+        }
+        return -1; // Indicador de error
+    }
+
     public int countElements() {
         String response = sendGetRequest("count_elements");
         if (response != null) {
