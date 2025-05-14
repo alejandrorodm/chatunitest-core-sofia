@@ -18,6 +18,7 @@ import zju.cst.aces.util.EmbeddingClient;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -52,65 +53,86 @@ public class SofiaHitsRunner extends MethodRunner {
         SOFIA_HITS phase_hits = (SOFIA_HITS) phase;
 
         long startTime = System.nanoTime();
-        if (config.isEnableObfuscate()) {
-            Obfuscator obfuscator = new Obfuscator(config);
-            PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
-            obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
+        try{
+            if (config.isEnableObfuscate()) {
+                Obfuscator obfuscator = new Obfuscator(config);
+                PromptInfo obfuscatedPromptInfo = new PromptInfo(promptInfo);
+                obfuscator.obfuscatePromptInfo(obfuscatedPromptInfo);
 
-            phase_hits.generateMethodSlice(pc);
-        } else {
-            phase_hits.generateMethodSlice(pc);
+                phase_hits.generateMethodSlice(pc);
+            } else {
+                phase_hits.generateMethodSlice(pc);
+            }
+        } catch (Exception e) {
+            System.err.println("Error durante la generación de slice: " + e.getMessage());
+            e.printStackTrace();
+            return false;
         }
 
         int successCount = 0;
-        JsonResponseProcessor.JsonData methodSliceInfo = JsonResponseProcessor.readJsonFromFile(promptInfo.getMethodSlicePath().resolve("slice.json"));
-        if (methodSliceInfo != null) {
-            // Accessing the steps
-            boolean hasErrors = false;
-            for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
-                // Test Generation Phase
-                hasErrors = false;
-                if (methodSliceInfo.getSteps().get(i) == null) continue;
-                promptInfo.setSliceNum(i);
-                promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i)); // todo 存储切片信息到promptInfo
-                phase_hits.generateSliceTest(pc); //todo 改成新的hits对切片生成单元测试方法
-                // Validation
-                if (phase_hits.validateTest(pc)) {
-                    successCount++;
-                    exportRecord(pc.getPromptInfo(), classInfo, num);
-                    continue;
-                } else {
-                    hasErrors = true;
-                }
-                if (hasErrors) {
-                    // Validation and Repair Phase
-                    for (int rounds = 1; rounds < config.getMaxRounds(); rounds++) {
 
-                        promptInfo.setRound(rounds);
+        Path slicePath = promptInfo.getMethodSlicePath().resolve("slice.json");
 
-                        // Repair
-                        phase_hits.generateSliceTest(pc);
-                        // Validation and process
-                        if (phase_hits.validateTest(pc)) { // if passed validation
-                            successCount++;
-                            exportRecord(pc.getPromptInfo(), classInfo, num);
-                            hasErrors = false;
-                            break; // successfully
-                        }
+        if (Files.exists(slicePath) && Files.isRegularFile(slicePath)) {
+            JsonResponseProcessor.JsonData methodSliceInfo = JsonResponseProcessor.readJsonFromFile(slicePath);
+            if (methodSliceInfo != null) {
+                // Accessing the steps
+                boolean hasErrors = false;
+                for (int i = 0; i < methodSliceInfo.getSteps().size(); i++) {
+                    // Test Generation Phase
+                    hasErrors = false;
+                    if (methodSliceInfo.getSteps().get(i) == null) continue;
 
+                    promptInfo.setSliceNum(i);
+                    promptInfo.setSliceStep(methodSliceInfo.getSteps().get(i)); 
+
+                    phase_hits.generateSliceTest(pc); 
+
+                    // Validation
+                    if (phase_hits.validateTest(pc)) {
+                        successCount++;
+                        exportRecord(pc.getPromptInfo(), classInfo, num);
+                        continue;
+                    } else {
+                        hasErrors = true;
                     }
+
+                    if (hasErrors) {
+                        // Validation and Repair Phase
+                        for (int rounds = 1; rounds < config.getMaxRounds(); rounds++) {
+                            promptInfo.setRound(rounds);
+
+                            // Repair
+                            phase_hits.generateSliceTest(pc);
+
+                            // Validation and process
+                            if (phase_hits.validateTest(pc)) {
+                                successCount++;
+                                exportRecord(pc.getPromptInfo(), classInfo, num);
+                                hasErrors = false;
+                                break; // successfully
+                            }
+                        }
+                    }
+
+                    exportSliceRecord(pc.getPromptInfo(), classInfo, num, i); 
                 }
 
-                exportSliceRecord(pc.getPromptInfo(), classInfo, num, i); //todo 检测是否顺利生成信息
+                if (config.generateJsonReport) {
+                    long endTime = System.nanoTime();
+                    float duration = (float) (endTime - startTime) / 1_000_000_000;
+                    generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
+                }
+                return !hasErrors;
+            } else {
+                System.err.println("Error: El archivo slice.json no pudo ser leído correctamente: " + slicePath);
+                return false;
             }
-            if (config.generateJsonReport) {
-                long endTime = System.nanoTime();
-                float duration = (float) (endTime - startTime) / 1_000_000_000;
-                generateJsonReportHITS(pc.getPromptInfo(), duration, methodSliceInfo.getSteps().size(), successCount);
-            }
-            return !hasErrors;
+        } else {
+            System.err.println("Advertencia: El archivo slice.json no existe o no es un archivo válido: " + slicePath);
+            return true; 
         }
-        return true;
+
     }
 
     /*

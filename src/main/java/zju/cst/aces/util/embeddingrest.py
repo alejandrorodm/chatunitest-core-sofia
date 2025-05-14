@@ -122,6 +122,7 @@ def save_code():
                             }]
                         )
                         print(f"ID {unique_id} actualizado con dependent_classes: {new_dependent_classes}")
+                        return jsonify({'message': 'ID updated with new dependent_classes'}), 200  # <-- Esta línea faltaba
                         
             except Exception as e:
                 print(f"Error actualizando dependent_classes para ID {unique_id}: {e}")
