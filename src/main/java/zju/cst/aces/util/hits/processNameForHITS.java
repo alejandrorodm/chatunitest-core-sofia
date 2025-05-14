@@ -2,87 +2,87 @@ package zju.cst.aces.util.hits;
 
 import java.io.*;
 import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.regex.*;
 
 public class processNameForHITS {
 
-    public static String classToProcess = "MetodosEntregaServiceImpl";
-
     public static void main(String[] args) {
-        // 文件夹路径
-        String folderPath = "C:/RAG/01-OV3/gestion-expedientes-master/chatunitest-tests/es/juntadeandalucia/ceceu/sede/gesexpedientes/service/impl";
-        System.out.println("Processing files in folder: " + folderPath);
-        // 正则表达式匹配文件名
-        Pattern filePattern = Pattern.compile("^(.*)_Test_slice(\\d+)\\.java$");
+        String rootFolder = "C:/RAG/01-OV3/gestion-expedientes-master/chatunitest-tests/";
+        System.out.println("Processing files in folder (recursively): " + rootFolder);
+
+        Pattern testPattern = Pattern.compile("^(.*)_Test_slice(\\d+)\\.java$");
         Pattern suitePattern = Pattern.compile("^(.*)_Suite\\.java$");
 
-        // 遍历文件夹
-        File folder = new File(folderPath);
-        if (!folder.exists() || !folder.isDirectory()) {
-            System.out.println("The specified folder does not exist or is not a directory.");
-            return;
-        }
+        try {
+            Files.walkFileTree(Paths.get(rootFolder), new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) {
+                    File file = filePath.toFile();
+                    String fileName = file.getName();
 
-        File[] files = folder.listFiles();
+                    if (!fileName.endsWith(".java")) return FileVisitResult.CONTINUE;
 
-        if (files != null && files.length > 0) {
-            for (File file : files) {
-                // 只处理 .java 文件
+                    Matcher suiteMatcher = suitePattern.matcher(fileName);
+                    Matcher testMatcher = testPattern.matcher(fileName);
 
-                if (file.isFile() && file.getName().endsWith(".java")) {
-                    Matcher matcher = filePattern.matcher(file.getName());
-                    Matcher suiteMatcher = suitePattern.matcher(file.getName());
-
+                    // Eliminar *_Suite.java
                     if (suiteMatcher.matches()) {
                         if (file.delete()) {
-                            System.out.println("Deleted file: " + file.getName());
+                            System.out.println("Deleted suite file: " + filePath);
                         } else {
-                            System.out.println("Failed to delete file: " + file.getName());
+                            System.out.println("Failed to delete suite file: " + filePath);
                         }
-                    
+                        return FileVisitResult.CONTINUE;
                     }
 
-                    if (matcher.matches()) {
-                        String xxx = matcher.group(1);
-                        String n = matcher.group(2);
-                        String newFileName = xxx + "_slice" + n + "_Test.java";
+                    // Renombrar *_Test_sliceN.java → *_sliceN_Test.java y modificar contenido
+                    if (testMatcher.matches()) {
+                        String baseName = testMatcher.group(1);
+                        String sliceNum = testMatcher.group(2);
 
-                        // 读取文件内容并替换类名
+                        String oldClassName = baseName + "_Test";
+                        String newClassName = baseName + "_slice" + sliceNum + "_Test";
+                        String newFileName = baseName + "_slice" + sliceNum + "_Test.java";
+
                         try {
-                            String content = new String(Files.readAllBytes(file.toPath()));
+                            String content = Files.readString(filePath);
 
-                            // Nombre viejo y nuevo
-                            String oldClassName = xxx + "_Test";
-                            String newClassName   = xxx + "_slice" + n + "_Test";
+                            // Reemplazar todas las instancias del nombre antiguo por el nuevo
+                            content = content.replaceAll("\\b" + Pattern.quote(oldClassName) + "\\b", Matcher.quoteReplacement(newClassName));
 
-                            // 1) Sustituimos la declaración de la clase
+                            // Añadir `public` a la línea de clase si no lo tiene ya
                             content = content.replaceAll(
-                                "\\bclass\\s+" + Pattern.quote(oldClassName) + "\\b",
-                                "class " + newClassName
+                                "(?m)^\\s*(?!public\\s)(class\\s+\\w+.*\\{)",
+                                "public $1"
                             );
 
-                            // 2) Sustituimos todas las demás referencias al nombre de la clase
-                            content = content.replaceAll(
-                                "\\b" + Pattern.quote(oldClassName) + "\\b",
-                                Matcher.quoteReplacement(newClassName)
-                            );
-                            Files.write(file.toPath(), content.getBytes());
+                            Files.writeString(filePath, content);
 
-                            File newFile = new File(folderPath, newFileName);
-                            if (file.renameTo(newFile)) {
-                                System.out.println("Renamed: " + file.getName() + " to " + newFileName);
+                            // Renombrar el archivo si es necesario
+                            File newFile = new File(file.getParentFile(), newFileName);
+                            if (!file.getName().equals(newFileName)) {
+                                if (file.renameTo(newFile)) {
+                                    System.out.println("Renamed file: " + filePath + " -> " + newFile.getPath());
+                                } else {
+                                    System.out.println("Failed to rename file: " + filePath);
+                                }
                             } else {
-                                System.out.println("Failed to rename: " + file.getName());
+                                System.out.println("No rename needed: " + filePath);
                             }
+
                         } catch (IOException e) {
-                            System.err.println("Error processing file: " + file.getName());
+                            System.err.println("Error processing file: " + filePath);
                             e.printStackTrace();
                         }
                     }
+
+                    return FileVisitResult.CONTINUE;
                 }
-            }
-        } else {
-            System.out.println("The specified folder does not exist or is empty.");
+            });
+        } catch (IOException e) {
+            System.err.println("Error walking file tree");
+            e.printStackTrace();
         }
     }
 }
