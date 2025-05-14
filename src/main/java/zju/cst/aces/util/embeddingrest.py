@@ -54,21 +54,17 @@ def home():
 def save_code():
     try:
         data = request.json
-        class_name = data.get('class_name')
+        class_name = data.get('class_name', 'Dependency')
         method_name = data.get('method_name')
         signature = data.get('signature')
+        fetched_dependent_classes = data.get('dependent_classes', "")
         code = data.get('code')
         
-        comment = data.get('comment', '')
-        annotations = data.get('annotations', '')
-        dependent_methods = data.get('dependent_methods', [])
-        dependent_classes = data.get('dependent_classes', "")
-        
-        if not class_name or not  method_name or not code:
+        if not code:
             return jsonify({'error': 'Missing class name or code'}), 400
         
-        # To avoid errores on expected metadata value
-        dependent_methods_str = json.dumps(dependent_methods)
+        if method_name is None:
+            method_name = extract_method_name(code)  # Llamar a la función para extraer el nombre del método
         
         # Verificar si ya existe
         unique_id = class_name + '-' + signature  # Define unique_id
@@ -80,7 +76,7 @@ def save_code():
         is_constructor = method_name == class_name.strip()  # Constructor check
         
         if not check_if_id_exists(unique_id):
-            print(f'Code to be saved: Class {class_name}, Signature: {signature}, Dep_classes: {dependent_classes}')
+            print(f'Code to be saved: Class {class_name}, Signature: {signature}, Dep_classes: {fetched_dependent_classes}')
             embeddings = generate_embedding(code)
             collection.add(
                 ids=[unique_id],
@@ -90,10 +86,7 @@ def save_code():
                     "method_name": method_name,
                     "signature": signature,
                     "code": code,
-                    #"comment": comment,
-                    #"annotations": annotations,
-                    #"dependent_methods": dependent_methods_str,
-                    "dependent_classes": str(dependent_classes),
+                    "dependent_classes": str(fetched_dependent_classes),
                     "is_constructor": str(is_constructor)  # Constructor check
                 }]
             )
@@ -102,32 +95,38 @@ def save_code():
             # Actualizar el registro existente añadiendo el nuevo dependent_classes
             try:
                 existing = collection.get(ids=[unique_id])
+                
                 if existing and len(existing.get('ids', [])) > 0:
-                    # Obtener el valor anterior de dependent_classes
+                    # Obtener el valor actual de la BDD de dependent_classes
                     prev_dependent_classes = existing['metadatas'][0].get('dependent_classes', "")
                     
-                    # Forzar que prev_dependent_classes sea string
-                    if isinstance(prev_dependent_classes, list):
-                        prev_dependent_classes = ",".join([str(c) for c in prev_dependent_classes])
-                    elif not isinstance(prev_dependent_classes, str):
-                        prev_dependent_classes = str(prev_dependent_classes)
+                    # Comprobar si ya contiene fetched_dependent_classes
+                    if str(fetched_dependent_classes).strip() in prev_dependent_classes:
+                        print(f"'{fetched_dependent_classes}' ya está en dependent_classes. No se actualiza.")
+                        return jsonify({'message': 'ID already exists and dependent_classes already contains the value'}), 200
+                    else:
+                        # Forzar que prev_dependent_classes sea string
+                        if isinstance(prev_dependent_classes, list):
+                            prev_dependent_classes = ",".join([str(c) for c in prev_dependent_classes])
+                        elif not isinstance(prev_dependent_classes, str):
+                            prev_dependent_classes = str(prev_dependent_classes)
+                            
+                        new_dependent_classes = prev_dependent_classes.strip() + "," + str(fetched_dependent_classes).strip()
                         
-                    new_dependent_classes = prev_dependent_classes.strip() + "," + str(dependent_classes).strip()
-                    
-                    # Actualizar el registro en la colección
-                    collection.update(
-                        ids=[unique_id],
-                        metadatas=[{
-                            **existing['metadatas'][0],
-                            "dependent_classes": new_dependent_classes
-                        }]
-                    )
-                print(f"ID {unique_id} actualizado con dependent_classes: {new_dependent_classes}")
+                        # Actualizar el registro en la colección
+                        collection.update(
+                            ids=[unique_id],
+                            metadatas=[{
+                                **existing['metadatas'][0],
+                                "dependent_classes": new_dependent_classes
+                            }]
+                        )
+                        print(f"ID {unique_id} actualizado con dependent_classes: {new_dependent_classes}")
+                        
             except Exception as e:
                 print(f"Error actualizando dependent_classes para ID {unique_id}: {e}")
                 return jsonify({'error': 'Error updating dependent_classes'}), 500
-            else:
-                return jsonify({'message': 'ID already exists, but updated dependent_classes'}), 200
+            
     except Exception as e:
         print(f"Error saving code: {e}")
         return jsonify({'error': str(e)}), 500
@@ -199,21 +198,23 @@ def search_similar_methods():
         data = request.json
         #print(f"Data received: {data}")
         test_class_name = data.get('test_class_name', '')
-        class_name = data.get('class_name', '')
         method_name = data.get('method_name', '')
         code = data.get('code')
 
         # Extract method name from the provided code
         method_name_from_code = extract_method_name(code)
         
-        if class_name == '' or method_name == '':
-            print("Class name or method name is empty")
-            class_name = 'Dependency'
-            method_name = method_name_from_code
-            #print("Code: ", code )
-            print("Method name from code: ", method_name_from_code)
-        else:
-            print(f'Class: {class_name}, Method: {method_name}')
+        if test_class_name != '' and method_name != '':
+            print(f'Class: {test_class_name}, Method: {method_name}')
+        
+        if method_name == '':
+            print("Method name is empty. Extracting from code")
+            if method_name_from_code is None:
+                print("No method name found in code")
+                return jsonify({'error': 'No method name found in code'}), 400
+            else:
+                print("Method name from code: ", method_name_from_code)
+                method_name = method_name_from_code
         
         max_neighbours = data.get('max_neighbours', 8)
         similarity_threshold = 0.75
@@ -225,7 +226,7 @@ def search_similar_methods():
         query_embedding = generate_embedding(code)
 
         # Búsqueda en la base de datos
-        if test_class_name:
+        if test_class_name != '':
             try:
                 results = collection.query(
                     query_embeddings=[query_embedding],
@@ -237,6 +238,8 @@ def search_similar_methods():
                 print(f"Error retrieving similar methods: {e}")
                 return jsonify({'error': 'Error retrieving similar methods', 'details': str(e)}), 500
         else:
+            print("Test class name is empty")
+
             try:
                 results = collection.query(
                     query_embeddings=[query_embedding],
@@ -255,7 +258,7 @@ def search_similar_methods():
             if similarity < similarity_threshold or similarity >= 1:
                 continue  # Evita valores irrelevantes
 
-            if meta.get("class_name") == class_name and meta.get("method_name") == method_name:
+            if meta.get("class_name") == test_class_name and meta.get("method_name") == method_name:
                 continue  # Evita devolver el mismo método que se está buscando
 
             matched_results.append({
@@ -298,7 +301,13 @@ def count_elements():
         else:
             print(f"Buscando elementos de la base de datos con clase dependiente {dependent_class}")
             
-            results = collection.get(include=["metadatas"], where={"dependent_classes": {"$in": [dependent_class.strip()]}})
+            # Filtrar manualmente porque dependent_classes es un string separado por comas
+            all_results = collection.get(include=["metadatas"])
+            filtered_metadatas = [
+                meta for meta in all_results["metadatas"]
+                if dependent_class.strip() in [c.strip() for c in meta.get("dependent_classes", "").split(",")]
+            ]
+            results = {"metadatas": filtered_metadatas}
             
         print(f"Total elements found: {len(results['metadatas'])}")
         total_elements = len(results["metadatas"])
