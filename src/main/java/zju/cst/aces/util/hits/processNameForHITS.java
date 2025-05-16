@@ -8,7 +8,7 @@ import java.util.regex.*;
 public class processNameForHITS {
 
     public static void main(String[] args) {
-        String rootFolder = "C:/RAG/01-OV3/gestion-expedientes-master/chatunitest-tests/";
+        String rootFolder = "C:/RAG/01-OV3/gestion-expedientes-master/results/";
         System.out.println("Processing files in folder (recursively): " + rootFolder);
 
         Pattern testPattern = Pattern.compile("^(.*)_Test_slice(\\d+)\\.java$");

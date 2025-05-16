@@ -131,7 +131,7 @@ public class Config {
         public int methodThreads = (int) Math.ceil((double) this.maxThreads / this.classThreads);
         public int testNumber = 5;
         public int maxRounds = 5;
-        public int ragPercent = 25;
+        public int ragPercent = 100;
         public int maxPromptTokens = 2600;
         public int maxResponseTokens = 1024;
         public int minErrorTokens = 500;
