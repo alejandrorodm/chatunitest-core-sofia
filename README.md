@@ -28,6 +28,15 @@ To enable the RAG module, you need to start the local embedding retrieval server
 ```bash
 python embeddingrest.py
 ```
+
+Now, the file it's located on 
+
+```bash
+src\main\java\zju\cst\aces\util
+```
+
+Feel free to move the file to a different directory if that works better for your setup.
+
 ### 🔧 Configuring Context Ratio for RAG
 
 To adjust the percentage of context used by the RAG (Retrieval-Augmented Generation) system, navigate to the following file in the project:
@@ -87,8 +96,13 @@ For detailed instructions, please refer to the Maven plugin section:
 ---
 
 ### 🗂️ Check BDD Information
+When you run `embeddingrest.py`, which is located in:
 
-When you run `embeddingrest.py`, a folder named `chroma` will be generated in the same directory where the script is located. This folder contains the database used to store information for the RAG system.
+```shell
+src\main\java\zju\cst\aces\util
+```
+
+a folder named `chroma` will be generated in the same directory where the script is located. This folder contains the database used to store information for the RAG system.
 
 You can inspect the contents of this database using tools such as [DB Browser for SQLite](https://sqlitebrowser.org/). Once opened, you can find detailed stored information under the `embedding_metadata` table, which includes metadata associated with the embedded documents.
 
