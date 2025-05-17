@@ -86,6 +86,15 @@ For detailed instructions, please refer to the Maven plugin section:
 
 ---
 
+### 🗂️ Check BDD Information
+
+When you run `embeddingrest.py`, a folder named `chroma` will be generated in the same directory where the script is located. This folder contains the database used to store information for the RAG system.
+
+You can inspect the contents of this database using tools such as [DB Browser for SQLite](https://sqlitebrowser.org/). Once opened, you can find detailed stored information under the `embedding_metadata` table, which includes metadata associated with the embedded documents.
+
+This is useful for verifying what content has been indexed and is being used during retrieval.
+
+
 ## Custom Content
 
 ### Using FTL Templates
