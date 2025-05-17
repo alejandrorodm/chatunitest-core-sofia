@@ -28,6 +28,17 @@ To enable the RAG module, you need to start the local embedding retrieval server
 ```bash
 python embeddingrest.py
 ```
+### 🔧 Configuring Context Ratio for RAG
+
+To adjust the percentage of context used by the RAG (Retrieval-Augmented Generation) system, navigate to the following file in the project:
+
+```bash
+src\main\java\zju\cst\aces\api\config\Config.java
+```
+
+Inside `Config.java`, locate the parameter responsible for the context ratio (e.g., `ragPercent`) and modify its value as needed. This value determines the portion of retrieved context that will be included during generation.
+
+Make sure to recompile the project after making changes for them to take effect.
 
 ### Default Port
 
