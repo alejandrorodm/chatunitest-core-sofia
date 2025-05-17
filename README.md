@@ -94,7 +94,9 @@ You can inspect the contents of this database using tools such as [DB Browser fo
 
 This is useful for verifying what content has been indexed and is being used during retrieval.
 
+Example:
 
+![RAG BDD](docs/img/rag_bdd.png)
 ## Custom Content
 
 ### Using FTL Templates
